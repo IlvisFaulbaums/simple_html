@@ -1,12 +1,15 @@
-<h2>Simple Poll</h2>
-
-<button onclick="vote('yes')">Yes</button>
-<button onclick="vote('no')">No</button>
-
-<h3 id="results">Loading...</h3>
-
 <script>
-const API = "https://api.sarunas.lat"; // <-- your API domain
+const API = "https://api.sarunas.lat";
+
+// Generate or get voter ID from localStorage
+function getVoterId() {
+  let id = localStorage.getItem("voter_id");
+  if (!id) {
+    id = crypto.randomUUID(); // unique ID per browser
+    localStorage.setItem("voter_id", id);
+  }
+  return id;
+}
 
 async function load() {
   try {
@@ -26,11 +29,20 @@ async function load() {
 
 async function vote(option) {
   try {
-    await fetch(API + "/vote", {
+    const res = await fetch(API + "/vote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ option })
+      body: JSON.stringify({ 
+        option, 
+        voter_id: getVoterId() 
+      })
     });
+
+    const data = await res.json();
+
+    if (data.error) {
+      alert(data.error); // prevents multiple voting
+    }
 
     load();
   } catch (err) {
