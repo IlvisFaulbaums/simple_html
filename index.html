@@ -6,25 +6,36 @@
 <h3 id="results">Loading...</h3>
 
 <script>
+const API = "https://api.sarunas.lat"; // <-- your API domain
+
 async function load() {
-  const res = await fetch("/results");
-  const data = await res.json();
+  try {
+    const res = await fetch(API + "/results");
+    const data = await res.json();
 
-  let text = "";
-  data.forEach(row => {
-    text += row.option + ": " + row.count + " | ";
-  });
+    let text = "";
+    data.forEach(row => {
+      text += row.option + ": " + row.count + " | ";
+    });
 
-  document.getElementById("results").innerText = text;
+    document.getElementById("results").innerText = text.slice(0, -3);
+  } catch (err) {
+    document.getElementById("results").innerText = "Error loading results";
+  }
 }
 
 async function vote(option) {
-  await fetch("/vote", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({option})
-  });
-  load();
+  try {
+    await fetch(API + "/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ option })
+    });
+
+    load();
+  } catch (err) {
+    alert("Error submitting vote");
+  }
 }
 
 load();
