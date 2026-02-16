@@ -1,10 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mana lapa</title>
+<meta charset="UTF-8">
+<title>Simple Poll</title>
 </head>
 <body>
-    <h1>Sveika, pasaule!!!!!!!!!!!!!!!!!!!!!!</h1>
-    <h1>Sveika, pasaule!!!!!!!!!!!!!!!!!!!!!!</h1>
+<h2>Do you like this poll?</h2>
+
+<button onclick="vote('yes')">Yes</button>
+<button onclick="vote('no')">No</button>
+
+<h3 id="results">Loading...</h3>
+
+<script>
+const API = "https://your-worker-name.your-subdomain.workers.dev";
+
+async function load() {
+  const res = await fetch(API + "/results");
+  const data = await res.json();
+
+  let text = "";
+  data.forEach(row => {
+    text += row.option + ": " + row.count + " | ";
+  });
+
+  document.getElementById("results").innerText = text;
+}
+
+async function vote(option) {
+  await fetch(API + "/vote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({option})
+  });
+  load();
+}
+
+load();
+setInterval(load, 2000); // auto-refresh every 2 sec
+</script>
 </body>
 </html>
