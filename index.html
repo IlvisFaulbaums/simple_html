@@ -59,7 +59,7 @@
             font-family: monospace;
             font-size: 18px;
             text-align: center;
-            letter-spacing: 5px;
+            letter-spacing: 2px;
             word-break: break-all;
         }
         #poll-container {
@@ -118,6 +118,19 @@
             padding: 5px 10px;
             border-radius: 20px;
             font-size: 14px;
+        }
+        .melody-bar {
+            display: inline-block;
+            width: 2px;
+            height: 20px;
+            background-color: #4CAF50;
+            margin: 0 5px;
+            vertical-align: middle;
+        }
+        .note-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -297,7 +310,7 @@
                 throw new Error(data.error || "Vote failed");
             }
 
-            // Pievieno noti melodijai
+            // Pievieno noti melodijai - saglabājam oriģinālo vērtību ar |
             melodyNotes.push(option);
             updateMelody();
             await playLastNote(option);
@@ -366,15 +379,25 @@ L:1/4
 Q:1/4=120
 K:C
 `;
-        const body = melodyNotes.join(" ");
         
-        notesElement.textContent = melodyNotes.join(" | ");
+        // Savienojam notis ar atstarpēm, bet paturam | kā taktsvītras
+        // Pārliecināmies, ka ap | ir atstarpes, lai ABCJS to pareizi interpretētu
+        const body = melodyNotes.join(" ").replace(/\|/g, ' | ');
+        
+        // Parādām lietotājam notis ar taktsvītrām
+        notesElement.innerHTML = melodyNotes.join(' <span style="color: #4CAF50; font-weight: bold;">|</span> ');
+        
         abcElement.innerHTML = "";
         
         try {
-            visualObj = ABCJS.renderAbc("abc-notation", header + body)[0];
+            console.log("Rendering ABC:", header + body);
+            visualObj = ABCJS.renderAbc("abc-notation", header + body, {
+                responsive: true,
+                staffwidth: 800
+            })[0];
         } catch (e) {
             console.error("Error rendering ABC:", e);
+            abcElement.innerHTML = `<p style="color: red;">Error rendering music: ${e.message}</p>`;
         }
     }
 
@@ -391,6 +414,12 @@ K:C
             abcSynth = new ABCJS.synth.CreateSynth();
         }
 
+        // Pārliecināmies, ka nots ir pareizā formātā atskaņošanai
+        // Ja tā ir taktsvītra, neko neatskaņojam
+        if (note === '|') {
+            return;
+        }
+
         const abcStr = `X:1
 T:Last Note
 M:4/4
@@ -400,7 +429,7 @@ K:C
 ` + note;
 
         try {
-            visualObj = ABCJS.renderAbc("abc-notation", abcStr)[0];
+            visualObj = ABCJS.renderAbc("abc-notation", abcStr, { responsive: true })[0];
             await abcSynth.init({ visualObj, audioContext });
             await abcSynth.prime();
             abcSynth.start();
@@ -431,17 +460,20 @@ K:C
         const questions = Object.values(groupedByQuestion);
         
         questions.forEach(question => {
+            const totalForQuestion = question.options.reduce((sum, opt) => sum + opt.count, 0);
+            
             html += `<div style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 6px;">`;
             html += `<strong style="color: #4CAF50;">Question ${question.question_id}</strong><br>`;
             
             question.options.forEach(opt => {
-                const percentage = polls.length > 0 ? Math.round((opt.count / polls.length) * 100) : 0;
+                const percentage = totalForQuestion > 0 ? Math.round((opt.count / totalForQuestion) * 100) : 0;
                 html += `<div style="display: flex; justify-content: space-between; margin: 5px 0;">
                     <span>${opt.option}</span>
-                    <span><strong>${opt.count}</strong> (${percentage}%)</span>
+                    <span><strong>${opt.count}</strong> ${totalForQuestion > 0 ? `(${percentage}%)` : ''}</span>
                 </div>`;
             });
             
+            html += `<div class="note-info">Total votes for this question: ${totalForQuestion}</div>`;
             html += `</div>`;
         });
         
@@ -476,11 +508,9 @@ K:C
         }
     }, { once: true });
 
-    // Pievieno atbalstu Enter taustiņam admin parolei
-    document.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && document.activeElement.tagName !== 'BUTTON') {
-            // Neko nedara, lai netraucētu
-        }
+    // Pārbauda vai kāda no opcijām ir taktsvītra un pielāgo attēlojumu
+    window.addEventListener('load', () => {
+        console.log("App loaded. Notes with '|' will be treated as bar lines.");
     });
 
 </script>
