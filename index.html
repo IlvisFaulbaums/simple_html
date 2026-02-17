@@ -32,9 +32,14 @@
             font-weight: bold;
             background-color: #4CAF50;
             color: white;
+            font-size: 16px;
         }
         .vote-btn:hover {
             background-color: #45a049;
+        }
+        .vote-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         #abc-notation {
             background: #fff9e6;
@@ -55,6 +60,7 @@
             font-size: 18px;
             text-align: center;
             letter-spacing: 5px;
+            word-break: break-all;
         }
         #poll-container {
             background: white;
@@ -79,6 +85,38 @@
         }
         .question-box {
             padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .question-box h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        .options-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .already-voted {
+            background-color: #ffd700;
+            color: #333;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .poll-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .vote-count {
+            background-color: #e0e0e0;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -86,7 +124,12 @@
 
 <h2>🎵 Live Musical Poll (D1) 🎵</h2>
 
-<div id="poll-container">Loading poll...</div>
+<div id="poll-container">
+    <div class="poll-header">
+        <h3>Loading polls...</h3>
+        <div class="vote-count" id="totalVotes">Total votes: 0</div>
+    </div>
+</div>
 
 <div>
     <button id="resetBtn">⚠️ Reset All Votes</button>
@@ -98,15 +141,17 @@
 <div id="results">Loading results...</div>
 
 <script>
-    const API = "https://api.sarunas.lat"; // <--- nomaini uz savu Worker URL
+    const API = "https://api.sarunas.lat"; // Tavs Worker URL
 
-    let questions = [];
+    let polls = []; // Visi jautājumi no /polls
+    let groupedByQuestion = {}; // Sagrupēti pēc question_id
     let melodyNotes = [];
+    let votedQuestions = new Set(); // Lai atcerētos, par kuriem jautājumiem jau balsots
     
     // Voter ID no localStorage
     let voterId = localStorage.getItem("voterId");
     if (!voterId) {
-        voterId = 'voter_' + Date.now();
+        voterId = 'voter_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem("voterId", voterId);
     }
 
@@ -116,100 +161,157 @@
     let visualObj = null;
 
     // ------------------
-    // Ielādē aptaujas + opcijas
+    // Ielādē visus jautājumus no /polls
     // ------------------
     async function loadPolls() {
         try {
-            const res = await fetch(API + "/polls");
-            const polls = await res.json();
-
-            questions = [];
+            const response = await fetch(API + "/polls");
+            if (!response.ok) throw new Error("Failed to fetch polls");
             
-            for (let poll of polls) {
-                const optsRes = await fetch(API + "/options?poll_id=" + poll.id);
-                const options = await optsRes.json();
-                questions.push({
-                    poll_id: poll.id,
-                    data_line: poll.data_line,
-                    options: options
+            polls = await response.json();
+            console.log("Polls from API:", polls); // Debug
+
+            // Sagrupē pēc question_id
+            groupedByQuestion = {};
+            polls.forEach(item => {
+                if (!groupedByQuestion[item.question_id]) {
+                    groupedByQuestion[item.question_id] = {
+                        question_id: item.question_id,
+                        options: []
+                    };
+                }
+                groupedByQuestion[item.question_id].options.push({
+                    option: item.option,
+                    count: item.count
                 });
-            }
+            });
 
-            // Parāda pirmo aptauju
-            if (questions.length > 0) {
-                showQuestion(questions[0]);
-            } else {
-                document.getElementById("poll-container").innerHTML = "No polls available";
-            }
+            console.log("Grouped questions:", groupedByQuestion); // Debug
+
+            // Parāda visus jautājumus
+            displayAllQuestions();
             
+            // Atjauno melodiju (ja ir saglabātas notis)
             updateMelody();
-            showResults();
+            
+            // Parāda rezultātus
+            displayResults();
+            
+            // Aprēķina kopējo balsu skaitu
+            updateTotalVotes();
             
         } catch (e) {
             console.error("Error loading polls:", e);
-            document.getElementById("poll-container").innerHTML = "Error loading polls";
+            document.getElementById("poll-container").innerHTML = `
+                <div class="poll-header">
+                    <h3>Error loading polls</h3>
+                    <div class="vote-count">Error: ${e.message}</div>
+                </div>
+            `;
         }
     }
 
     // ------------------
-    // Parāda vienu aptaujas jautājumu
+    // Parāda visus jautājumus ar to opcijām
     // ------------------
-    function showQuestion(question) {
+    function displayAllQuestions() {
         const container = document.getElementById("poll-container");
-        container.innerHTML = "";
+        container.innerHTML = '<div class="poll-header"><h3>Available Polls</h3><div class="vote-count" id="totalVotes">Total votes: 0</div></div>';
 
-        const box = document.createElement("div");
-        box.className = "question-box";
-        box.innerHTML = `<h3>Question ${question.poll_id}</h3>`;
-
-        // Pārbauda vai options eksistē un sadala tos
-        if (question.options && question.options.option_text) {
-            const opts = question.options.option_text.split(',');
-            
-            opts.forEach(opt => {
-                const btn = document.createElement("button");
-                btn.className = "vote-btn";
-                btn.textContent = opt.trim();
-                btn.onclick = () => vote(question.poll_id, opt.trim());
-                box.appendChild(btn);
-            });
-        } else {
-            box.innerHTML += "<p>No options available</p>";
+        const questions = Object.values(groupedByQuestion);
+        
+        if (questions.length === 0) {
+            container.innerHTML += "<p>No polls available</p>";
+            return;
         }
 
-        container.appendChild(box);
+        questions.forEach(question => {
+            const box = document.createElement("div");
+            box.className = "question-box";
+            box.id = `question-${question.question_id}`;
+            
+            // Pārbauda vai lietotājs jau ir balsots par šo jautājumu
+            const hasVoted = votedQuestions.has(question.question_id);
+            
+            box.innerHTML = `
+                <h3>Question ${question.question_id}</h3>
+                ${hasVoted ? '<div class="already-voted">✓ You have already voted on this question</div>' : ''}
+                <div class="options-container" id="options-${question.question_id}"></div>
+            `;
+
+            const optionsContainer = box.querySelector(`#options-${question.question_id}`);
+            
+            // Pievieno visas opcijas
+            question.options.forEach(opt => {
+                const btn = document.createElement("button");
+                btn.className = "vote-btn";
+                btn.textContent = opt.option;
+                btn.disabled = hasVoted; // Atspējo, ja jau balsots
+                
+                btn.onclick = () => vote(question.question_id, opt.option);
+                optionsContainer.appendChild(btn);
+            });
+
+            container.appendChild(box);
+        });
+
+        // Atjauno total votes
+        updateTotalVotes();
     }
 
     // ------------------
     // Balsošana
     // ------------------
-    async function vote(poll_id, option) {
+    async function vote(question_id, option) {
         try {
+            console.log("Voting:", { question_id, option, voterId });
+            
             const response = await fetch(API + "/vote", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     voter_id: voterId,
-                    poll_id: poll_id,
-                    option_id: option
+                    question_id: question_id,
+                    option: option
                 })
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                throw new Error("Vote failed");
+                if (response.status === 403 && data.error === "You have already voted!") {
+                    // Lietotājs jau ir balsots
+                    votedQuestions.add(question_id);
+                    // Atjauno pogu stāvokli
+                    const questionBox = document.getElementById(`question-${question_id}`);
+                    if (questionBox) {
+                        const alreadyVotedDiv = document.createElement("div");
+                        alreadyVotedDiv.className = "already-voted";
+                        alreadyVotedDiv.textContent = "✓ You have already voted on this question";
+                        questionBox.insertBefore(alreadyVotedDiv, questionBox.querySelector('.options-container'));
+                        
+                        // Atspējo visas pogas
+                        const buttons = questionBox.querySelectorAll('.vote-btn');
+                        buttons.forEach(btn => btn.disabled = true);
+                    }
+                }
+                throw new Error(data.error || "Vote failed");
             }
 
-            // Pievieno noti melodijai (pieņemot, ka opcija ir nots)
+            // Pievieno noti melodijai
             melodyNotes.push(option);
             updateMelody();
             await playLastNote(option);
             
-            // Atsvaidzina rezultātus
+            // Pievieno question_id balsoto sarakstam
+            votedQuestions.add(question_id);
+            
+            // Atjauno rezultātus
             await loadPolls();
             
         } catch (e) {
             console.error("Error voting:", e);
-            alert("Failed to submit vote");
+            alert("Failed to submit vote: " + e.message);
         }
     }
 
@@ -231,14 +333,22 @@
                 throw new Error("Reset failed");
             }
 
+            const data = await response.json();
+            console.log("Reset response:", data);
+
+            // Notīra lokālos datus
             melodyNotes = [];
+            votedQuestions.clear();
+            
+            // Pārlādē aptaujas
             await loadPolls();
             updateMelody();
-            alert("All votes reset!");
+            
+            alert("All votes reset successfully!");
             
         } catch (e) {
             console.error("Error resetting:", e);
-            alert("Reset failed");
+            alert("Reset failed: " + e.message);
         }
     }
 
@@ -280,6 +390,7 @@ K:C
     async function playLastNote(note) {
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            await audioContext.resume();
         }
         
         if (!abcSynth) {
@@ -315,42 +426,64 @@ K:C
     // ------------------
     // Parāda balsošanas rezultātus
     // ------------------
-    function showResults() {
+    function displayResults() {
         const resContainer = document.getElementById("results");
         
-        if (!questions.length) {
+        if (!polls.length) {
             resContainer.innerHTML = "No votes yet";
             return;
         }
 
-        let html = "";
+        let html = "<h3>Current Results</h3>";
+        const questions = Object.values(groupedByQuestion);
         
-        for (let q of questions) {
-            html += `<strong>Question ${q.poll_id}</strong><br>`;
+        questions.forEach(question => {
+            html += `<div style="margin-bottom: 15px;">`;
+            html += `<strong>Question ${question.question_id}</strong><br>`;
             
-            if (q.options && Array.isArray(q.options)) {
-                for (let opt of q.options) {
-                    html += `${opt.option_text} = ${opt.votes || 0}<br>`;
-                }
-            } else if (q.options && q.options.option_text) {
-                // Ja options ir objekts, nevis masīvs
-                const opts = q.options.option_text.split(',');
-                for (let opt of opts) {
-                    html += `${opt.trim()} = 0<br>`;
-                }
-            }
+            question.options.forEach(opt => {
+                html += `${opt.option} = ${opt.count}<br>`;
+            });
             
-            html += "<br>";
-        }
+            html += `</div>`;
+        });
         
         resContainer.innerHTML = html;
     }
 
     // ------------------
+    // Aprēķina kopējo balsu skaitu
+    // ------------------
+    function updateTotalVotes() {
+        const totalVotes = polls.reduce((sum, item) => sum + item.count, 0);
+        const totalElement = document.getElementById("totalVotes");
+        if (totalElement) {
+            totalElement.textContent = `Total votes: ${totalVotes}`;
+        }
+    }
+
+    // ------------------
     // Inicializācija
     // ------------------
+    
+    // Pārbauda vai lietotājs jau ir balsojis par kādu jautājumu
+    async function checkVotedQuestions() {
+        // Šeit varētu būt API, kas atgriež lietotāja balsojumus
+        // Pašlaik mēs to uzzinām tikai balsojot
+    }
+
+    // Sākumā ielādē aptaujas
     loadPolls();
-    setInterval(loadPolls, 5000);
+    
+    // Atsvaidzina ik pēc 10 sekundēm
+    setInterval(loadPolls, 10000);
+
+    // Pievieno audio konteksta aktivizāciju
+    document.addEventListener('click', () => {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }, { once: true });
 
 </script>
 
