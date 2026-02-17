@@ -2,70 +2,135 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Melody Poll - Full Reset</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Responsive Musical Poll</title>
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; }
-        #app-card { background: white; width: 100%; max-width: 550px; padding: 30px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); position: relative; margin-bottom: 20px; }
-        
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; border-radius: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s ease; }
-        
-        .status-text { text-align: center; color: #1877f2; font-weight: bold; margin-bottom: 25px; height: 24px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1.5px; }
+        :root {
+            --primary: #1877f2;
+            --success: #42b72a;
+            --warning: #f7b928;
+            --danger: #ff4d4d;
+            --bg: #f0f2f5;
+            --text: #1c1e21;
+            --text-secondary: #65676b;
+        }
 
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            padding: 10px; 
+            background: var(--bg); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            color: var(--text);
+        }
+
+        #app-card, #results-frame { 
+            background: white; 
+            width: 100%; 
+            max-width: 600px; 
+            padding: 20px; 
+            border-radius: 20px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            position: relative; 
+            margin-bottom: 20px; 
+        }
+
+        @media (min-width: 600px) {
+            body { padding: 40px 20px; }
+            #app-card, #results-frame { padding: 30px; }
+        }
+
+        #overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: white; border-radius: 20px; z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            transition: opacity 0.5s ease; text-align: center; padding: 20px;
+        }
+        
+        .status-text { 
+            text-align: center; color: var(--primary); font-weight: bold; 
+            margin-bottom: 20px; height: 24px; text-transform: uppercase; 
+            font-size: 0.75rem; letter-spacing: 1.2px; 
+        }
+
+        /* Voting Options */
         .option-item {
-            border: 2px solid #e4e6eb; border-radius: 16px; margin-bottom: 15px;
-            padding: 15px; background: #fff; transition: all 0.3s ease;
+            border: 2px solid #e4e6eb; border-radius: 16px; margin-bottom: 12px;
+            padding: 12px; background: #fff; transition: all 0.3s ease;
             opacity: 0.3; pointer-events: none;
         }
         
-        .is-playing { opacity: 1; border-color: #42b72a; background: #f6ffed; transform: scale(1.02); }
-        .is-played { border-color: #f7b928; opacity: 0.7; }
-        .can-vote { opacity: 1; pointer-events: auto; cursor: pointer; border-color: #1877f2; }
-        .can-vote:hover { background: #f0f7ff; transform: translateY(-2px); border-width: 3px; }
+        .is-playing { opacity: 1; border-color: var(--success); background: #f6ffed; transform: scale(1.01); }
+        .is-played { border-color: var(--warning); opacity: 0.7; }
+        .can-vote { opacity: 1; pointer-events: auto; cursor: pointer; border-color: var(--primary); }
+        .can-vote:hover { background: #f0f7ff; border-width: 2px; }
+        .can-vote:active { transform: scale(0.98); }
 
-        .notation-slot { width: 100%; min-height: 100px; }
+        .notation-slot { width: 100%; min-height: 80px; }
+        
         .progress-track { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 10px; }
-        .progress-fill { height: 100%; background: #42b72a; width: 0%; }
+        .progress-fill { height: 100%; background: var(--success); width: 0%; }
 
-        .primary-btn { background: #1877f2; color: white; border: none; padding: 20px 50px; border-radius: 40px; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
+        /* Buttons */
+        .primary-btn { 
+            background: var(--primary); color: white; border: none; 
+            padding: 16px 32px; border-radius: 40px; font-weight: bold; 
+            font-size: 1.1rem; cursor: pointer; width: 80%; max-width: 300px;
+        }
 
-        #results-frame { background: white; width: 100%; max-width: 550px; padding: 25px; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .results-header { font-weight: bold; color: #65676b; font-size: 0.9rem; margin-bottom: 15px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .results-header { 
+            font-weight: bold; color: var(--text-secondary); font-size: 0.8rem; 
+            margin-bottom: 15px; text-align: center; border-bottom: 1px solid #eee; 
+            padding-bottom: 10px; letter-spacing: 1px;
+        }
+
         #winning-melody-svg { width: 100%; min-height: 100px; }
 
-        .admin-section { width: 100%; max-width: 550px; text-align: center; margin-bottom: 40px; }
-        .reset-btn { background: #ff4d4d; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 0.8rem; opacity: 0.4; transition: 0.3s; }
-        .reset-btn:hover { opacity: 1; }
+        .admin-section { width: 100%; max-width: 600px; text-align: center; margin: 20px 0 40px 0; }
+        .reset-btn { 
+            background: none; color: var(--text-secondary); border: 1px solid #ddd; 
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.7rem; 
+            transition: 0.3s; 
+        }
+        .reset-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+        
+        h2 { font-size: 1.4rem; margin-top: 0; }
+        p { font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div id="app-card">
     <div id="overlay">
-        <h2>🎵 Start New Session</h2>
-        <p style="color: #65676b; margin-bottom: 30px;">Wait for the sequence, then vote.</p>
+        <h2>🎵 Start Session</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 30px;">Musical sequences will play automatically.</p>
         <button class="primary-btn" onclick="startApp()">Enter Poll</button>
     </div>
 
-    <h2 style="text-align: center;">Sequence Poll</h2>
-    <div id="status" class="status-text">Connecting...</div>
+    <h2 style="text-align: center;">Musical Poll</h2>
+    <div id="status" class="status-text">Loading...</div>
     <div id="options-list"></div>
 </div>
 
 <div id="results-frame">
-    <div class="results-header">🏆 LIVE WINNING MELODY</div>
+    <div class="results-header">🏆 LIVE COMMUNITY MELODY</div>
     <div id="winning-melody-svg"></div>
 </div>
 
 <div class="admin-section">
-    <button class="reset-btn" onclick="adminReset()">⚠️ ADMIN: WIPE DATABASE & RESET POLL</button>
+    <button class="reset-btn" onclick="adminReset()">⚠️ ADMIN: RESET DATABASE</button>
 </div>
 
 <script>
     const API = "https://api.sarunas.lat";
     const SOUNDFONT = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
-    const SEC_PER_UNIT = 0.25; // C1=1/8 @ 120BPM
+    const SEC_PER_UNIT = 0.25; 
 
     let audioCtx = null;
     let pollData = [];
@@ -73,80 +138,54 @@
     let currentUI = [];
     let activeSynth = null;
 
-    // 1. Fetch Polls & Refresh Winning Melody
+    // Detect screen width for notation scaling
+    const isMobile = window.innerWidth < 600;
+
     async function updateData() {
         try {
             const res = await fetch(API + "/polls");
             const data = await res.json();
-            
             const grouped = data.reduce((acc, obj) => {
                 if (!acc[obj.question_id]) acc[obj.question_id] = { id: obj.question_id, opts: [] };
                 acc[obj.question_id].opts.push(obj);
                 return acc;
             }, {});
-            
             pollData = Object.values(grouped);
             renderWinningMelody(pollData);
         } catch (e) { console.error("API error", e); }
     }
 
-    // 2. Render Winning Melody (The frame at the bottom)
     function renderWinningMelody(data) {
-        let fullWinningAbc = "X:1\nT:Live Results\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n";
+        let fullWinningAbc = "X:1\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n";
         let melodyPath = "";
-
         data.forEach(question => {
-            // Find option with most votes
-            let winner = question.opts.reduce((prev, current) => 
-                (prev.count > current.count) ? prev : current
-            );
-            // Only add to melody if it has at least one vote
-            if (winner && winner.count > 0) {
-                melodyPath += winner.option + " | ";
-            }
+            let winner = question.opts.reduce((prev, current) => (prev.count > current.count) ? prev : current);
+            if (winner && winner.count > 0) melodyPath += winner.option + " | ";
         });
-
-        if (melodyPath === "") melodyPath = "z8"; // Show rest if no votes yet
-        ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: 0.9 });
+        if (melodyPath === "") melodyPath = "z8";
+        ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: isMobile ? 0.7 : 0.9 });
     }
 
-    // 3. Admin Reset - Clears DB and resets local state
     async function adminReset() {
-        const password = prompt("ADMIN: Enter password to WIPE DATABASE and RESET ALL VOTES:");
+        const password = prompt("Admin password:");
         if (!password) return;
-
         try {
             const res = await fetch(API + "/admin/reset", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: password })
+                body: JSON.stringify({ password })
             });
-
             if (res.ok) {
-                alert("Database Wiped. Resetting poll...");
-                
-                // 1. Reset local tracking
                 currentIdx = 0;
                 if (activeSynth) activeSynth.stop();
-                
-                // 2. Clear Voter ID so user can vote again
                 localStorage.removeItem('voterId');
-
-                // 3. Show overlay for new audio handshake
                 document.getElementById('overlay').style.display = 'flex';
                 document.getElementById('overlay').style.opacity = '1';
-
-                // 4. Refresh data immediately
                 await updateData();
-            } else {
-                alert("Reset Failed: Incorrect Password");
-            }
-        } catch (e) {
-            alert("Error connecting to Reset API.");
-        }
+            } else { alert("Failed"); }
+        } catch (e) { alert("Error"); }
     }
 
-    // 4. Duration Calculation (C1=1, C2=2, etc)
     function getDuration(abc) {
         const clean = abc.replace(/[|\[\]\s]/g, '');
         const pattern = /([A-Ga-gz][',]*)(\d*)/g;
@@ -157,14 +196,11 @@
         return units * SEC_PER_UNIT;
     }
 
-    // 5. App Start
     async function startApp() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') await audioCtx.resume();
-        
         document.getElementById('overlay').style.opacity = '0';
         setTimeout(() => document.getElementById('overlay').style.display = 'none', 500);
-        
         loadAndPlayCurrent();
     }
 
@@ -175,12 +211,12 @@
         currentUI = [];
 
         if (currentIdx >= pollData.length) {
-            status.innerText = "All Questions Voted!";
+            status.innerText = "All Done!";
             return;
         }
 
         const q = pollData[currentIdx];
-        status.innerText = "🎧 Playing Sequence...";
+        status.innerText = "🎧 Playing...";
 
         q.opts.forEach((opt, i) => {
             const div = document.createElement('div');
@@ -191,26 +227,18 @@
 
             const abcText = opt.option;
             const fullAbc = `X:1\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n${abcText}`;
-            const visualObj = ABCJS.renderAbc(svgId, fullAbc, { staffwidth: 450, scale: 0.85 })[0];
-            
+            const visualObj = ABCJS.renderAbc(svgId, fullAbc, { responsive: "resize", scale: isMobile ? 0.75 : 0.85 })[0];
             currentUI.push({ visualObj, abcText, barId, duration: getDuration(abcText), el: div });
         });
-
         triggerSequence(0);
     }
 
     function triggerSequence(index) {
-        if (index >= currentUI.length) {
-            unlockVoting();
-            return;
-        }
-
+        if (index >= currentUI.length) { unlockVoting(); return; }
         const task = currentUI[index];
         if (activeSynth) { activeSynth.stop(); activeSynth = null; }
-
         task.el.classList.add('is-playing');
         activeSynth = new ABCJS.synth.CreateSynth();
-
         activeSynth.init({ visualObj: task.visualObj, audioContext: audioCtx, options: { soundFontUrl: SOUNDFONT } })
         .then(() => activeSynth.prime())
         .then(() => {
@@ -218,7 +246,6 @@
             bar.style.transition = `width ${task.duration}s linear`;
             bar.style.width = "100%";
             activeSynth.start();
-
             setTimeout(() => {
                 if (activeSynth) activeSynth.stop();
                 task.el.classList.remove('is-playing');
@@ -229,7 +256,7 @@
     }
 
     function unlockVoting() {
-        document.getElementById('status').innerText = "Vote for your favorite";
+        document.getElementById('status').innerText = "Vote Now";
         currentUI.forEach(item => {
             item.el.classList.remove('is-played');
             item.el.classList.add('can-vote');
@@ -239,32 +266,22 @@
 
     async function castVote(val) {
         currentUI.forEach(i => i.el.onclick = null);
-        
-        // Generate or get voterId
-        let vId = localStorage.getItem('voterId');
-        if(!vId) {
-            vId = 'v_' + Math.random().toString(36).substr(2,9);
-            localStorage.setItem('voterId', vId);
-        }
-
+        let vId = localStorage.getItem('voterId') || 'v_' + Math.random().toString(36).substr(2,9);
+        localStorage.setItem('voterId', vId);
         try {
             await fetch(API + "/vote", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ voter_id: vId, question_id: pollData[currentIdx].id, option: val })
             });
-
             currentIdx++;
             await updateData();
             loadAndPlayCurrent();
-        } catch (e) {
-            alert("Voting error");
-            unlockVoting();
-        }
+        } catch (e) { alert("Error"); unlockVoting(); }
     }
 
     updateData();
-    setInterval(updateData, 5000); // Sync global results every 5s
+    setInterval(updateData, 5000);
 </script>
 
 </body>
