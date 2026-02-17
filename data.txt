@@ -1,6 +1,3 @@
-q1	do re mi	0
-q1	mi re do	0
-q2	mi fa sol	0
-q2	sol fa mi	0
-q3	do mi sol	0
-q3	sol mi do	0
+1,DO2,SOL2
+2,RE2,FA2
+3,MI4,SOL4
