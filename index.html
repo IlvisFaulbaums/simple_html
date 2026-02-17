@@ -3,662 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Musical Poll D1</title>
+    <title>Live Melody Poll</title>
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            max-width: 1000px;
-            margin: auto;
-            background: #f5f5f5;
+        body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; }
+        #app-card { background: white; width: 100%; max-width: 550px; padding: 30px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); position: relative; margin-bottom: 20px; }
+        
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; border-radius: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s ease; }
+        
+        .status-text { text-align: center; color: #1877f2; font-weight: bold; margin-bottom: 25px; height: 24px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1.5px; }
+
+        .option-item {
+            border: 2px solid #e4e6eb; border-radius: 16px; margin-bottom: 15px;
+            padding: 15px; background: #fff; transition: all 0.3s ease;
+            opacity: 0.3; pointer-events: none;
         }
-        h2 {
-            text-align: center;
-            color: #333;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            cursor: pointer;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-        }
-        .vote-btn {
-            margin: 5px;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-weight: bold;
-            background-color: #4CAF50;
-            color: white;
-            font-size: 16px;
-        }
-        .vote-btn:hover {
-            background-color: #45a049;
-        }
-        .vote-btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        #abc-notation {
-            background: #fff9e6;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border: 2px solid #4CAF50;
-            min-height: 150px;
-            overflow-x: auto;
-        }
-        #notesSequence {
-            background: #333;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            font-family: monospace;
-            font-size: 18px;
-            text-align: center;
-            letter-spacing: 2px;
-            word-break: break-all;
-        }
-        #poll-container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        #results {
-            margin-top: 20px;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-        #resetBtn {
-            background: #f44336;
-            color: white;
-        }
-        #resetBtn:hover {
-            background: #d32f2f;
-        }
-        .question-box {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin-bottom: 10px;
-        }
-        .question-box h3 {
-            margin-top: 0;
-            color: #4CAF50;
-        }
-        .options-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .already-voted {
-            background-color: #ffd700;
-            color: #333;
-            padding: 5px 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-        .poll-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .vote-count {
-            background-color: #e0e0e0;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        .playing-indicator {
-            color: #4CAF50;
-            font-weight: bold;
-            animation: pulse 1s infinite;
-            margin-left: 10px;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin: 10px 0;
-            flex-wrap: wrap;
-        }
+        
+        .is-playing { opacity: 1; border-color: #42b72a; background: #f6ffed; transform: scale(1.02); }
+        .is-played { border-color: #f7b928; opacity: 0.7; }
+        .can-vote { opacity: 1; pointer-events: auto; cursor: pointer; border-color: #1877f2; }
+        .can-vote:hover { background: #f0f7ff; transform: translateY(-2px); border-width: 3px; }
+
+        .notation-slot { width: 100%; min-height: 100px; }
+        .progress-track { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: #42b72a; width: 0%; }
+
+        .primary-btn { background: #1877f2; color: white; border: none; padding: 20px 50px; border-radius: 40px; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
+
+        /* Results Section */
+        #results-frame { background: white; width: 100%; max-width: 550px; padding: 25px; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .results-header { font-weight: bold; color: #65676b; font-size: 0.9rem; margin-bottom: 15px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        #winning-melody-svg { width: 100%; min-height: 100px; }
     </style>
 </head>
 <body>
 
-<h2>🎵 Live Musical Poll (D1) 🎵</h2>
-
-<div id="poll-container">
-    <div class="poll-header">
-        <h3>Loading polls...</h3>
-        <div class="vote-count" id="totalVotes">Total votes: 0</div>
+<div id="app-card">
+    <div id="overlay">
+        <h2>🎵 Ready to Vote?</h2>
+        <p style="color: #65676b; margin-bottom: 30px;">Options play automatically.</p>
+        <button class="primary-btn" onclick="startApp()">Enter Poll</button>
     </div>
+
+    <h2 style="text-align: center;">Sequence Poll</h2>
+    <div id="status" class="status-text">Connecting...</div>
+    <div id="options-list"></div>
 </div>
 
-<div class="controls">
-    <button id="resetBtn">⚠️ Reset All Votes</button>
-    <button id="playFullBtn" style="background-color: #4CAF50; color: white;">▶ Play Full Melody</button>
-    <button id="stopBtn" style="background-color: #ff9800; color: white;">⏹ Stop</button>
+<div id="results-frame">
+    <div class="results-header">🏆 CURRENT WINNING MELODY (LIVE)</div>
+    <div id="winning-melody-svg"></div>
 </div>
-
-<h3>🎼 Current Melody</h3>
-<div id="abc-notation"></div>
-<div id="notesSequence">No notes yet</div>
-<div id="results">Loading results...</div>
 
 <script>
-    const API = "https://api.sarunas.lat"; // Tavs Worker URL
+    const API = "https://api.sarunas.lat";
+    const SOUNDFONT = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
+    const SEC_PER_UNIT = 0.25; // C1=1/8 @ 120BPM
 
-    let polls = [];
-    let groupedByQuestion = {};
-    let melodyNotes = [];
-    let votedQuestions = new Set();
-    let isPlaying = false;
-    let currentSynth = null;
-    let audioContext = null;
-    
-    // Voter ID no localStorage
-    let voterId = localStorage.getItem("voterId");
-    if (!voterId) {
-        voterId = 'voter_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem("voterId", voterId);
-    }
+    let audioCtx = null;
+    let pollData = [];
+    let currentIdx = 0;
+    let currentUI = [];
+    let activeSynth = null;
 
-    // ------------------
-    // Ielādē visus jautājumus no /polls
-    // ------------------
-    async function loadPolls() {
+    // 1. Fetch Polls & Refresh Results
+    async function updateData() {
         try {
-            const response = await fetch(API + "/polls");
-            if (!response.ok) throw new Error("Failed to fetch polls");
+            const res = await fetch(API + "/polls");
+            const data = await res.json();
             
-            polls = await response.json();
-            console.log("Polls from API:", polls);
-
-            // Sagrupē pēc question_id
-            groupedByQuestion = {};
-            polls.forEach(item => {
-                if (!groupedByQuestion[item.question_id]) {
-                    groupedByQuestion[item.question_id] = {
-                        question_id: item.question_id,
-                        options: []
-                    };
-                }
-                groupedByQuestion[item.question_id].options.push({
-                    option: item.option,
-                    count: item.count
-                });
-            });
-
-            // Parāda visus jautājumus
-            displayAllQuestions();
+            // Group by question_id
+            const grouped = data.reduce((acc, obj) => {
+                if (!acc[obj.question_id]) acc[obj.question_id] = { id: obj.question_id, opts: [] };
+                acc[obj.question_id].opts.push(obj);
+                return acc;
+            }, {});
             
-            // Atjauno melodiju
-            updateMelody();
-            
-            // Parāda rezultātus
-            displayResults();
-            
-            // Aprēķina kopējo balsu skaitu
-            updateTotalVotes();
-            
-        } catch (e) {
-            console.error("Error loading polls:", e);
-            document.getElementById("poll-container").innerHTML = `
-                <div class="poll-header">
-                    <h3>Error loading polls</h3>
-                    <div class="vote-count">Error: ${e.message}</div>
-                </div>
-            `;
-        }
+            pollData = Object.values(grouped);
+            renderWinningMelody(pollData);
+        } catch (e) { console.error("API error", e); }
     }
 
-    // ------------------
-    // Parāda visus jautājumus ar to opcijām
-    // ------------------
-    function displayAllQuestions() {
-        const container = document.getElementById("poll-container");
-        container.innerHTML = '<div class="poll-header"><h3>Available Polls</h3><div class="vote-count" id="totalVotes">Total votes: 0</div></div>';
+    // 2. Render Winning Melody Frame
+    function renderWinningMelody(data) {
+        let fullWinningAbc = "X:1\nT:Community Masterpiece\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n";
+        let melodyPath = "";
 
-        const questions = Object.values(groupedByQuestion);
+        // For each question, find the option with the highest count
+        data.forEach(question => {
+            let winner = question.opts.reduce((prev, current) => 
+                (prev.count > current.count) ? prev : current
+            );
+            
+            if (winner.count > 0) {
+                melodyPath += winner.option + " | ";
+            }
+        });
+
+        if (melodyPath === "") melodyPath = "z8"; // Rest if no votes
+        ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: 0.9 });
+    }
+
+    // 3. Calculation for playback
+    function getDuration(abc) {
+        const clean = abc.replace(/[|\[\]\s]/g, '');
+        const pattern = /([A-Ga-gz][',]*)(\d*)/g;
+        let units = 0, m;
+        while ((m = pattern.exec(clean)) !== null) {
+            units += (m[2] === "") ? 1 : parseInt(m[2]);
+        }
+        return units * SEC_PER_UNIT;
+    }
+
+    // 4. Start Application
+    async function startApp() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
         
-        if (questions.length === 0) {
-            container.innerHTML += "<p>No polls available</p>";
+        document.getElementById('overlay').style.opacity = '0';
+        setTimeout(() => document.getElementById('overlay').style.display = 'none', 500);
+        
+        loadAndPlayCurrent();
+    }
+
+    // 5. Load UI and Sequential Play
+    function loadAndPlayCurrent() {
+        const list = document.getElementById('options-list');
+        const status = document.getElementById('status');
+        list.innerHTML = '';
+        currentUI = [];
+
+        if (currentIdx >= pollData.length) {
+            status.innerText = "All Polls Done!";
             return;
         }
 
-        questions.forEach((question, index) => {
-            const box = document.createElement("div");
-            box.className = "question-box";
-            box.dataset.questionId = question.question_id;
-            box.dataset.questionIndex = index;
-            
-            const hasVoted = votedQuestions.has(question.question_id);
-            
-            box.innerHTML = `
-                <h3>Question ${question.question_id}</h3>
-                ${hasVoted ? '<div class="already-voted">✓ You have already voted on this question</div>' : ''}
-                <div class="options-container" id="options-${index}"></div>
-            `;
+        const q = pollData[currentIdx];
+        status.innerText = "🎧 Listening...";
 
-            const optionsContainer = box.querySelector(`#options-${index}`);
+        q.opts.forEach((opt, i) => {
+            const div = document.createElement('div');
+            div.className = 'option-item';
+            const svgId = `svg-${i}`, barId = `bar-${i}`;
             
-            question.options.forEach(opt => {
-                const btn = document.createElement("button");
-                btn.className = "vote-btn";
-                btn.textContent = opt.option;
-                btn.disabled = hasVoted;
-                
-                btn.onclick = () => vote(question.question_id, opt.option);
-                optionsContainer.appendChild(btn);
-            });
+            div.innerHTML = `<div id="${svgId}" class="notation-slot"></div><div class="progress-track"><div id="${barId}" class="progress-fill"></div></div>`;
+            list.appendChild(div);
 
-            container.appendChild(box);
+            const abcText = opt.option;
+            const fullAbc = `X:1\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n${abcText}`;
+            const visualObj = ABCJS.renderAbc(svgId, fullAbc, { staffwidth: 450, scale: 0.85 })[0];
+            
+            currentUI.push({ visualObj, abcText, barId, duration: getDuration(abcText), el: div });
         });
 
-        updateTotalVotes();
+        triggerSequence(0);
     }
 
-    // ------------------
-    // Atskaņo ABC notāciju caur ABCJS
-    // ------------------
-    async function playABC(abcString, indicatorText = "▶ Playing...") {
-        if (!abcString) return;
-        
-        await stopPlayback();
-        
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            await audioContext.resume();
+    function triggerSequence(index) {
+        if (index >= currentUI.length) {
+            unlockVoting();
+            return;
         }
 
-        // Parāda indikatoru
-        const notesElement = document.getElementById("notesSequence");
-        const indicator = document.createElement("span");
-        indicator.className = "playing-indicator";
-        indicator.textContent = indicatorText;
-        notesElement.appendChild(indicator);
-        
-        isPlaying = true;
-        
-        try {
-            // Renderē ABC vizuāli (bet nerāda to pašā atskaņošanas laikā)
-            const visualObj = ABCJS.renderAbc("*", abcString, {
-                responsive: true,
-                staffwidth: 600
-            })[0];
-            
-            // Izveido sintēzes objektu
-            const synth = new ABCJS.synth.CreateSynth();
-            currentSynth = synth;
-            
-            await synth.init({ 
-                visualObj: visualObj, 
-                audioContext,
-                options: {
-                    soundFontUrl: "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/"
-                }
-            });
-            
-            await synth.prime();
-            
-            // Atskaņo
-            synth.start();
-            
-            // Atgriež promise, kas beidzas kad atskaņošana beigusies
-            return new Promise((resolve) => {
-                const checkInterval = setInterval(() => {
-                    if (!isPlaying) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    }
-                }, 100);
-            });
-            
-        } catch (e) {
-            console.error("Error playing ABC:", e);
-            isPlaying = false;
-            if (indicator && indicator.parentNode) {
-                indicator.remove();
-            }
-            throw e;
-        }
-    }
+        const task = currentUI[index];
+        if (activeSynth) { activeSynth.stop(); activeSynth = null; }
 
-    // ------------------
-    // Atskaņo vienu frāzi
-    // ------------------
-    async function playSinglePhrase(phrase) {
-        if (!phrase) return;
-        
-        const header = `X:1
-T:Note Phrase
-M:4/4
-L:1/4
-Q:1/4=120
-K:C
-`;
-        
-        // Formatē frāzi ar taktsvītrām
-        const formattedPhrase = phrase.replace(/\|/g, ' | ');
-        const fullAbc = header + formattedPhrase;
-        
-        await playABC(fullAbc, "▶ Playing phrase...");
-        
-        // Noņem indikatoru
-        const indicator = document.querySelector('.playing-indicator');
-        if (indicator) {
-            indicator.remove();
-        }
-        
-        isPlaying = false;
-    }
+        task.el.classList.add('is-playing');
+        activeSynth = new ABCJS.synth.CreateSynth();
 
-    // ------------------
-    // Atskaņo pilnu melodiju
-    // ------------------
-    async function playFullMelody() {
-        if (!melodyNotes.length) return;
-        
-        const header = `X:1
-T:Full Melody
-M:4/4
-L:1/4
-Q:1/4=120
-K:C
-`;
-        
-        // Izveido pilnu ABC notāciju
-        let fullAbc = header;
-        
-        melodyNotes.forEach((phrase, index) => {
-            // Pievieno frāzi
-            fullAbc += phrase;
-            
-            // Pievieno taktsvītru starp frāzēm, izņemot pēdējo
-            if (index < melodyNotes.length - 1) {
-                if (!phrase.endsWith('|')) {
-                    fullAbc += ' |';
-                }
-            }
-            
-            fullAbc += ' ';
+        activeSynth.init({ visualObj: task.visualObj, audioContext: audioCtx, options: { soundFontUrl: SOUNDFONT } })
+        .then(() => activeSynth.prime())
+        .then(() => {
+            const bar = document.getElementById(task.barId);
+            bar.style.transition = `width ${task.duration}s linear`;
+            bar.style.width = "100%";
+            activeSynth.start();
+
+            setTimeout(() => {
+                if (activeSynth) activeSynth.stop();
+                task.el.classList.remove('is-playing');
+                task.el.classList.add('is-played');
+                setTimeout(() => triggerSequence(index + 1), 200);
+            }, task.duration * 1000);
         });
-        
-        console.log("Playing full melody:", fullAbc);
-        
-        await playABC(fullAbc, "▶ Playing full melody...");
-        
-        // Noņem indikatoru
-        const indicator = document.querySelector('.playing-indicator');
-        if (indicator) {
-            indicator.remove();
-        }
-        
-        isPlaying = false;
     }
 
-    // ------------------
-    // Aptur atskaņošanu
-    // ------------------
-    async function stopPlayback() {
-        if (currentSynth) {
-            try {
-                currentSynth.stop();
-            } catch (e) {
-                console.log("Error stopping synth:", e);
-            }
-            currentSynth = null;
-        }
-        
-        isPlaying = false;
-        
-        // Noņem indikatoru
-        const indicator = document.querySelector('.playing-indicator');
-        if (indicator) {
-            indicator.remove();
-        }
-        
-        // Neliela pauze, lai synth apturētos
-        await new Promise(resolve => setTimeout(resolve, 50));
+    function unlockVoting() {
+        document.getElementById('status').innerText = "Select your favorite";
+        currentUI.forEach(item => {
+            item.el.classList.remove('is-played');
+            item.el.classList.add('can-vote');
+            item.el.onclick = () => castVote(item.abcText);
+        });
     }
 
-    // ------------------
-    // Balsošana
-    // ------------------
-    async function vote(question_id, option) {
+    async function castVote(val) {
+        currentUI.forEach(i => i.el.onclick = null);
+        document.getElementById('status').innerText = "Voting...";
+
+        const vId = localStorage.getItem('voterId') || 'v_' + Math.random().toString(36).substr(2,9);
+        localStorage.setItem('voterId', vId);
+
         try {
-            console.log("Voting:", { question_id, option, voterId });
-            
-            const response = await fetch(API + "/vote", {
+            await fetch(API + "/vote", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    voter_id: voterId,
-                    question_id: question_id,
-                    option: option
-                })
+                body: JSON.stringify({ voter_id: vId, question_id: pollData[currentIdx].id, option: val })
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                if (response.status === 403 && data.error === "You have already voted!") {
-                    votedQuestions.add(question_id);
-                    
-                    const questionBoxes = document.querySelectorAll('.question-box');
-                    questionBoxes.forEach(box => {
-                        if (box.dataset.questionId === question_id) {
-                            const alreadyVotedDiv = document.createElement("div");
-                            alreadyVotedDiv.className = "already-voted";
-                            alreadyVotedDiv.textContent = "✓ You have already voted on this question";
-                            box.insertBefore(alreadyVotedDiv, box.querySelector('.options-container'));
-                            
-                            const buttons = box.querySelectorAll('.vote-btn');
-                            buttons.forEach(btn => btn.disabled = true);
-                        }
-                    });
-                }
-                throw new Error(data.error || "Vote failed");
-            }
-
-            // Pievieno noti melodijai
-            melodyNotes.push(option);
-            updateMelody();
-            
-            // Atskaņo tikko pievienoto nošu frāzi
-            await playSinglePhrase(option);
-            
-            votedQuestions.add(question_id);
-            await loadPolls();
-            
+            currentIdx++;
+            await updateData(); // Refresh winning melody after vote
+            loadAndPlayCurrent();
         } catch (e) {
-            console.error("Error voting:", e);
-            alert("Failed to submit vote: " + e.message);
+            alert("Connection error");
+            unlockVoting();
         }
     }
 
-    // ------------------
-    // Reset visas balsis
-    // ------------------
-    document.getElementById("resetBtn").onclick = async () => {
-        const pwd = prompt("Enter admin password:");
-        if (!pwd) return;
-        
-        try {
-            const response = await fetch(API + "/admin/reset", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: pwd })
-            });
-
-            if (!response.ok) {
-                throw new Error("Reset failed");
-            }
-
-            await stopPlayback();
-            
-            melodyNotes = [];
-            votedQuestions.clear();
-            
-            await loadPolls();
-            updateMelody();
-            
-            alert("All votes reset successfully!");
-            
-        } catch (e) {
-            console.error("Error resetting:", e);
-            alert("Reset failed: " + e.message);
-        }
-    };
-
-    // ------------------
-    // Stop poga
-    // ------------------
-    document.getElementById("stopBtn").onclick = stopPlayback;
-
-    // ------------------
-    // Atjauno ABCJS melodiju
-    // ------------------
-    function updateMelody() {
-        const notesElement = document.getElementById("notesSequence");
-        const abcElement = document.getElementById("abc-notation");
-        
-        if (!melodyNotes.length) {
-            notesElement.textContent = "No notes yet";
-            abcElement.innerHTML = "";
-            return;
-        }
-
-        const header = `X:1
-T:Live Melody
-M:4/4
-L:1/4
-Q:1/4=120
-K:C
-`;
-        
-        // Izveido pilnu ABC notāciju
-        let fullAbc = header;
-        
-        melodyNotes.forEach((phrase, index) => {
-            fullAbc += phrase;
-            if (index < melodyNotes.length - 1) {
-                if (!phrase.endsWith('|')) {
-                    fullAbc += ' |';
-                }
-            }
-            fullAbc += ' ';
-        });
-        
-        // Vienkāršs teksta attēlojums
-        notesElement.innerHTML = melodyNotes.join(' <span style="color: #4CAF50; font-weight: bold;">|</span> ');
-        
-        // Renderē ABC notāciju
-        abcElement.innerHTML = "";
-        
-        try {
-            ABCJS.renderAbc("abc-notation", fullAbc, {
-                responsive: true,
-                staffwidth: 800
-            });
-        } catch (e) {
-            console.error("Error rendering ABC:", e);
-            abcElement.innerHTML = `<p style="color: red;">Error rendering music: ${e.message}</p>`;
-        }
-    }
-
-    // ------------------
-    // Parāda balsošanas rezultātus
-    // ------------------
-    function displayResults() {
-        const resContainer = document.getElementById("results");
-        
-        if (!polls.length) {
-            resContainer.innerHTML = "No votes yet";
-            return;
-        }
-
-        let html = "<h3>Current Results</h3>";
-        const questions = Object.values(groupedByQuestion);
-        
-        questions.forEach(question => {
-            const totalForQuestion = question.options.reduce((sum, opt) => sum + opt.count, 0);
-            
-            html += `<div style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 6px;">`;
-            html += `<strong style="color: #4CAF50;">Question ${question.question_id}</strong><br>`;
-            
-            question.options.forEach(opt => {
-                const percentage = totalForQuestion > 0 ? Math.round((opt.count / totalForQuestion) * 100) : 0;
-                html += `<div style="display: flex; justify-content: space-between; margin: 5px 0;">
-                    <span>${opt.option}</span>
-                    <span><strong>${opt.count}</strong> ${totalForQuestion > 0 ? `(${percentage}%)` : ''}</span>
-                </div>`;
-            });
-            
-            html += `<div class="note-info">Total votes for this question: ${totalForQuestion}</div>`;
-            html += `</div>`;
-        });
-        
-        resContainer.innerHTML = html;
-    }
-
-    // ------------------
-    // Aprēķina kopējo balsu skaitu
-    // ------------------
-    function updateTotalVotes() {
-        const totalVotes = polls.reduce((sum, item) => sum + (item.count || 0), 0);
-        const totalElement = document.getElementById("totalVotes");
-        if (totalElement) {
-            totalElement.textContent = `Total votes: ${totalVotes}`;
-        }
-    }
-
-    // ------------------
-    // Inicializācija
-    // ------------------
-    
-    // Pievieno pogu klikšķa handlerus
-    document.getElementById("playFullBtn").onclick = playFullMelody;
-    document.getElementById("stopBtn").onclick = stopPlayback;
-
-    // Sākumā ielādē aptaujas
-    loadPolls();
-    
-    // Atsvaidzina ik pēc 10 sekundēm
-    setInterval(loadPolls, 10000);
-
-    // Pievieno audio konteksta aktivizāciju
-    document.addEventListener('click', () => {
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-    }, { once: true });
-
-    // Pievieno audio konteksta aktivizāciju arī pirms atskaņošanas
-    document.addEventListener('click', async () => {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-        }
-    });
-
+    // Start background fetching
+    updateData();
+    setInterval(updateData, 5000); // Live updates every 5s
 </script>
 
 </body>
