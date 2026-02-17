@@ -81,20 +81,20 @@ button:active {
   gap: 8px;
 }
 
-.vote-btn.whole {
-  background: #9C27B0;
+.vote-btn.eighth-sound {
+  background: #2196F3; /* Blue for eighth note sound */
 }
 
-.vote-btn.half {
-  background: #FF9800;
+.vote-btn.quarter-sound {
+  background: #4CAF50; /* Green for quarter note sound */
 }
 
-.vote-btn.quarter {
-  background: #4CAF50;
+.vote-btn.half-sound {
+  background: #FF9800; /* Orange for half note sound */
 }
 
-.vote-btn.eighth {
-  background: #2196F3;
+.vote-btn.whole-sound {
+  background: #9C27B0; /* Purple for whole note sound */
 }
 
 .playback-controls {
@@ -146,20 +146,20 @@ button:active {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.stat-card.whole {
-  border-top: 4px solid #9C27B0;
+.stat-card.eighth-sound {
+  border-top: 4px solid #2196F3;
 }
 
-.stat-card.half {
-  border-top: 4px solid #FF9800;
-}
-
-.stat-card.quarter {
+.stat-card.quarter-sound {
   border-top: 4px solid #4CAF50;
 }
 
-.stat-card.eighth {
-  border-top: 4px solid #2196F3;
+.stat-card.half-sound {
+  border-top: 4px solid #FF9800;
+}
+
+.stat-card.whole-sound {
+  border-top: 4px solid #9C27B0;
 }
 
 .stat-card h4 {
@@ -208,37 +208,44 @@ button:active {
   width: 100px;
 }
 
-.duration-badge {
-  font-size: 12px;
-  padding: 2px 6px;
+/* Sound mapping legend */
+.sound-mapping {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin: 10px 0;
+  padding: 10px;
+  background: #e0e0e0;
   border-radius: 4px;
-  background: rgba(255,255,255,0.3);
+  flex-wrap: wrap;
+  font-size: 14px;
 }
 
-.note-symbol {
-  font-size: 20px;
+.sound-mapping span {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: white;
 }
 
-/* Duration colors */
-.whole-bg { background: #9C27B0; }
-.half-bg { background: #FF9800; }
-.quarter-bg { background: #4CAF50; }
-.eighth-bg { background: #2196F3; }
+.eighth-sound-bg { background: #2196F3; }
+.quarter-sound-bg { background: #4CAF50; }
+.half-sound-bg { background: #FF9800; }
+.whole-sound-bg { background: #9C27B0; }
 
-.whole-text { color: #9C27B0; }
-.half-text { color: #FF9800; }
-.quarter-text { color: #4CAF50; }
-.eighth-text { color: #2196F3; }
+.eighth-sound-text { color: #2196F3; }
+.quarter-sound-text { color: #4CAF50; }
+.half-sound-text { color: #FF9800; }
+.whole-sound-text { color: #9C27B0; }
 </style>
 </head>
 <body>
 
-<h2>🎵 Musical Voting Poll - From Data.txt 🎵</h2>
+<h2>🎵 Musical Voting Poll - Custom Sound Mapping 🎵</h2>
 
 <div id="poll-container">Loading questions...</div>
 
 <div id="music-section">
-  <h3>🎼 Live Musical Score</h3>
+  <h3>🎼 Live Musical Score (ABCJS Notation)</h3>
   
   <div class="playback-controls">
     <button class="playback-btn" onclick="playVoteMelody()" id="playBtn">▶️ Play Votes</button>
@@ -264,15 +271,15 @@ button:active {
     </select>
   </div>
 
-  <!-- CORRECTED Duration Legend -->
-  <div style="display: flex; gap: 15px; justify-content: center; margin: 10px 0; padding: 10px; background: #e0e0e0; border-radius: 4px; flex-wrap: wrap;">
-    <span><span class="whole-text">𝅝</span> C1 = Whole note (4 beats)</span>
-    <span><span class="half-text">𝅗𝅥</span> C2 = Half note (2 beats)</span>
-    <span><span class="quarter-text">♩</span> C4 = Quarter note (1 beat)</span>
-    <span><span class="eighth-text">♪</span> C8 = Eighth note (½ beat)</span>
+  <!-- Sound Mapping Legend (what you hear) -->
+  <div class="sound-mapping">
+    <span class="eighth-sound-bg">C1 = Eighth note sound (½ beat)</span>
+    <span class="quarter-sound-bg">C2 = Quarter note sound (1 beat)</span>
+    <span class="half-sound-bg">C4 = Half note sound (2 beats)</span>
+    <span class="whole-sound-bg">C8 = Whole note sound (4 beats)</span>
   </div>
 
-  <!-- ABC Notation Display -->
+  <!-- ABC Notation Display (what you see) -->
   <div id="abc-notation"></div>
   
   <!-- Playback Status -->
@@ -316,37 +323,21 @@ const noteFrequencyMap = {
   'B': 493.88
 };
 
-// CORRECTED: Duration to beats mapping based on note value
-// In standard notation, smaller number = longer duration
-const durationToBeats = {
-  '1': 4,  // Whole note (semibreve) - 4 beats
-  '2': 2,  // Half note (minim) - 2 beats
-  '4': 1,  // Quarter note (crotchet) - 1 beat
-  '8': 0.5 // Eighth note (quaver) - 1/2 beat
+// CUSTOM SOUND MAPPING: Map ABC notation to actual sound duration
+// ABC notation -> Sound duration multiplier (relative to quarter note)
+const soundMapping = {
+  '1': 0.5,  // C1 sounds like eighth note (½ beat)
+  '2': 1,    // C2 sounds like quarter note (1 beat)
+  '4': 2,    // C4 sounds like half note (2 beats)
+  '8': 4     // C8 sounds like whole note (4 beats)
 };
 
-// Duration to display symbol
-const durationSymbol = {
-  '1': '𝅝',  // Whole note
-  '2': '𝅗𝅥',  // Half note
-  '4': '♩',  // Quarter note
-  '8': '♪'   // Eighth note
-};
-
-// Duration to color class
-const durationColor = {
-  '1': 'whole-bg',
-  '2': 'half-bg',
-  '4': 'quarter-bg',
-  '8': 'eighth-bg'
-};
-
-// Duration to text description
-const durationText = {
-  '1': 'Whole (4 beats)',
-  '2': 'Half (2 beats)',
-  '4': 'Quarter (1 beat)',
-  '8': 'Eighth (½ beat)'
+// For display purposes only - what the notation looks like
+const notationSymbol = {
+  '1': '𝅝',  // Shown as whole note in ABC
+  '2': '𝅗𝅥',  // Shown as half note in ABC
+  '4': '♩',  // Shown as quarter note in ABC
+  '8': '♪'   // Shown as eighth note in ABC
 };
 
 // Parse ABC note notation (e.g., "C2" -> { pitch: 'C', duration: '2' })
@@ -377,7 +368,7 @@ async function initAudio() {
   }
 }
 
-// Play a note with specific duration from ABC notation - CORRECTED PLAYBACK
+// Play a note with CUSTOM sound mapping
 async function playABCNote(abcNote) {
   try {
     await initAudio();
@@ -390,32 +381,12 @@ async function playABCNote(abcNote) {
     
     const frequency = getFrequency(parsed.pitch);
     
-    // CORRECTED: Calculate duration based on note value
-    // At tempo 120, one quarter note = 0.5 seconds
+    // CUSTOM: Use sound mapping instead of actual duration
     const quarterNoteDuration = 60 / tempo; // seconds per quarter note
+    const soundMultiplier = soundMapping[parsed.duration] || 1;
+    const noteDuration = quarterNoteDuration * soundMultiplier;
     
-    // Map ABC note duration to multiplier
-    let durationMultiplier;
-    switch(parsed.duration) {
-      case '1': // Whole note
-        durationMultiplier = 4;
-        break;
-      case '2': // Half note
-        durationMultiplier = 2;
-        break;
-      case '4': // Quarter note
-        durationMultiplier = 1;
-        break;
-      case '8': // Eighth note
-        durationMultiplier = 0.5;
-        break;
-      default:
-        durationMultiplier = 1;
-    }
-    
-    const noteDuration = quarterNoteDuration * durationMultiplier;
-    
-    console.log(`Playing ${abcNote}: ${parsed.pitch} at ${frequency}Hz for ${noteDuration.toFixed(3)}s (${durationMultiplier} × quarter note)`);
+    console.log(`Playing ${abcNote}: Sound = ${soundMultiplier}× quarter note (${noteDuration.toFixed(3)}s)`);
     
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -423,24 +394,24 @@ async function playABCNote(abcNote) {
     oscillator.type = 'sine';
     oscillator.frequency.value = frequency;
     
-    // Envelope based on duration
+    // Envelope based on sound duration
     const now = audioContext.currentTime;
     gainNode.gain.setValueAtTime(0, now);
     gainNode.gain.linearRampToValueAtTime(volume, now + 0.01);
     
-    // Different sustain for longer notes
-    if (durationMultiplier >= 2) {
-      // Half and whole notes - longer sustain
+    // Adjust sustain based on sound multiplier
+    if (soundMultiplier >= 2) {
+      // Longer sounds (half and whole note sounds)
       gainNode.gain.setValueAtTime(volume, now + 0.02);
       gainNode.gain.linearRampToValueAtTime(volume * 0.7, now + noteDuration * 0.7);
       gainNode.gain.linearRampToValueAtTime(volume * 0.4, now + noteDuration * 0.9);
-    } else if (durationMultiplier === 1) {
-      // Quarter note - normal decay
+    } else if (soundMultiplier === 1) {
+      // Medium sounds (quarter note sound)
       gainNode.gain.setValueAtTime(volume, now + 0.02);
       gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.6);
       gainNode.gain.linearRampToValueAtTime(volume * 0.2, now + noteDuration * 0.8);
     } else {
-      // Eighth note - quick decay
+      // Short sounds (eighth note sound)
       gainNode.gain.setValueAtTime(volume, now + 0.01);
       gainNode.gain.linearRampToValueAtTime(volume * 0.3, now + noteDuration * 0.4);
       gainNode.gain.linearRampToValueAtTime(volume * 0.1, now + noteDuration * 0.6);
@@ -487,7 +458,7 @@ async function playVoteMelody() {
   const allNotes = [];
   currentVoteData.forEach(v => {
     for (let i = 0; i < v.count; i++) {
-      allNotes.push(v.option); // This is the ABC note like "C2", "G4", etc.
+      allNotes.push(v.option);
     }
   });
   
@@ -499,8 +470,9 @@ async function playVoteMelody() {
   
   document.getElementById('playback-status').innerHTML = `Playing: 0/${allNotes.length} notes`;
   
-  // Calculate total beats
-  let totalBeats = 0;
+  // Calculate total sound beats
+  let totalSoundBeats = 0;
+  const quarterNoteDuration = 60 / tempo;
   
   // Play each note in sequence
   for (let i = 0; i < allNotes.length; i++) {
@@ -509,17 +481,31 @@ async function playVoteMelody() {
     currentNoteIndex = i;
     const note = allNotes[i];
     const parsed = parseABCNote(note);
-    const beats = parsed ? durationToBeats[parsed.duration] : 1;
-    totalBeats += beats;
+    
+    // Calculate sound beats for this note using custom mapping
+    let soundBeats = 1;
+    if (parsed) {
+      soundBeats = soundMapping[parsed.duration] || 1;
+    }
+    totalSoundBeats += soundBeats;
+    
+    const totalSeconds = totalSoundBeats * quarterNoteDuration;
+    
+    let soundDesc = '';
+    if (soundBeats === 0.5) soundDesc = 'eighth';
+    else if (soundBeats === 1) soundDesc = 'quarter';
+    else if (soundBeats === 2) soundDesc = 'half';
+    else if (soundBeats === 4) soundDesc = 'whole';
     
     document.getElementById('playback-status').innerHTML = 
-      `Playing note ${i+1}/${allNotes.length}: ${note} (${durationText[parsed?.duration] || '1 beat'}) - Total beats: ${totalBeats.toFixed(1)}`;
+      `Playing note ${i+1}/${allNotes.length}: ${note} (sounds like ${soundDesc} note) - Total: ${totalSoundBeats.toFixed(1)} beats (${totalSeconds.toFixed(1)}s)`;
     
     await playABCNote(note);
   }
   
   if (isPlaying) {
-    document.getElementById('playback-status').innerHTML = `Playback complete! Total beats: ${totalBeats.toFixed(1)}`;
+    const totalSeconds = totalSoundBeats * quarterNoteDuration;
+    document.getElementById('playback-status').innerHTML = `Playback complete! ${totalSoundBeats.toFixed(1)} beats (${totalSeconds.toFixed(1)}s)`;
   }
   
   stopVoteMelody();
@@ -556,7 +542,7 @@ function updateKey() {
   updateMusicScore();
 }
 
-// Convert votes to ABC notation (preserving original durations)
+// Convert votes to ABC notation (preserving original durations for display)
 function votesToABC(data) {
   const tempo = document.getElementById('tempo').value;
   let abcHeader = `X:1\nT:Votes from Data.txt\nC:Live Poll\nM:4/4\nL:1/4\nQ:1/4=${tempo}\nK:${currentKey}\n`;
@@ -573,21 +559,31 @@ function votesToABC(data) {
     return abcHeader + "z4 |]"; // Quarter rest if no votes
   }
   
-  // Create ABC notation preserving original durations
+  // Create ABC notation preserving original durations for DISPLAY
   let abcBody = '';
   let currentMeasureBeats = 0;
   
   allNotes.forEach((note, index) => {
+    abcBody += note + ' ';
+    
+    // For display purposes, we use the actual ABC duration for bar lines
     const parsed = parseABCNote(note);
+    let displayBeats = 1;
     if (parsed) {
-      abcBody += note + ' ';
-      currentMeasureBeats += durationToBeats[parsed.duration];
-      
-      // Add bar line when measure is full (4 beats) or at the end
-      if (Math.abs(currentMeasureBeats - 4) < 0.01 || currentMeasureBeats > 3.99 || index === allNotes.length - 1) {
-        abcBody += '| ';
-        currentMeasureBeats = 0;
+      // Use actual ABC duration for measure counting in display
+      switch(parsed.duration) {
+        case '1': displayBeats = 4; break;
+        case '2': displayBeats = 2; break;
+        case '4': displayBeats = 1; break;
+        case '8': displayBeats = 0.5; break;
       }
+    }
+    currentMeasureBeats += displayBeats;
+    
+    // Add bar line when measure is full (4 beats) or at the end
+    if (currentMeasureBeats >= 3.99 || index === allNotes.length - 1) {
+      abcBody += '| ';
+      currentMeasureBeats = 0;
     }
   });
   
@@ -658,14 +654,28 @@ async function loadQuestions() {
       
       const btn = document.createElement("button");
       
-      // Set button class based on duration
-      const durationClass = durationColor[parsed.duration] || 'quarter-bg';
-      btn.className = `vote-btn ${durationClass}`;
+      // Set button class based on SOUND mapping
+      let soundClass = 'quarter-sound';
+      let soundDesc = '';
+      const soundBeats = soundMapping[parsed.duration] || 1;
       
-      // Add note symbol and name with duration explanation
-      const symbol = durationSymbol[parsed.duration] || '♩';
-      const beats = durationToBeats[parsed.duration];
-      btn.innerHTML = `${symbol} ${parsed.pitch} (${opt}) <span style="font-size: 10px; opacity: 0.8;">${beats} beat${beats !== 1 ? 's' : ''}</span>`;
+      if (soundBeats === 0.5) soundClass = 'eighth-sound';
+      else if (soundBeats === 1) soundClass = 'quarter-sound';
+      else if (soundBeats === 2) soundClass = 'half-sound';
+      else if (soundBeats === 4) soundClass = 'whole-sound';
+      
+      btn.className = `vote-btn ${soundClass}-sound`;
+      
+      // Show what the note looks like in ABC vs what it sounds like
+      const notationSym = notationSymbol[parsed.duration] || '♩';
+      
+      let soundText = '';
+      if (soundBeats === 0.5) soundText = 'sounds ⅛';
+      else if (soundBeats === 1) soundText = 'sounds ¼';
+      else if (soundBeats === 2) soundText = 'sounds ½';
+      else if (soundBeats === 4) soundText = 'sounds 1';
+      
+      btn.innerHTML = `${notationSym} ${parsed.pitch} (${opt}) <span style="font-size: 10px; opacity: 0.8;">${soundText}</span>`;
       
       btn.onclick = () => vote(qid, opt);
       
@@ -686,7 +696,7 @@ async function loadQuestions() {
 
 // Vote function
 async function vote(questionId, option) {
-  // Play the ABC note
+  // Play the note with custom sound mapping
   await playABCNote(option);
   
   const res = await fetch(API + "/vote", {
@@ -721,12 +731,23 @@ async function loadResults() {
     
     grouped[qid].forEach(o => { 
       const parsed = parseABCNote(o.option);
-      const symbol = parsed ? durationSymbol[parsed.duration] : '♩';
-      const colorClass = parsed ? durationColor[parsed.duration] : 'quarter-bg';
-      const beats = parsed ? durationToBeats[parsed.duration] : 1;
       
-      html += `<span class="${colorClass}" style="display: inline-block; margin: 5px; padding: 5px 10px; border-radius: 4px; color: white;" title="${beats} beat${beats !== 1 ? 's' : ''}">`;
-      html += `${symbol} ${o.option}=${o.count}`;
+      let notationSym = '♩';
+      let soundClass = 'quarter-sound-bg';
+      let soundBeats = 1;
+      
+      if (parsed) {
+        notationSym = notationSymbol[parsed.duration] || '♩';
+        soundBeats = soundMapping[parsed.duration] || 1;
+        
+        if (soundBeats === 0.5) soundClass = 'eighth-sound-bg';
+        else if (soundBeats === 1) soundClass = 'quarter-sound-bg';
+        else if (soundBeats === 2) soundClass = 'half-sound-bg';
+        else if (soundBeats === 4) soundClass = 'whole-sound-bg';
+      }
+      
+      html += `<span class="${soundClass}" style="display: inline-block; margin: 5px; padding: 5px 10px; border-radius: 4px; color: white;" title="Looks like ${parsed?.duration}, sounds like ${soundBeats} beat(s)">`;
+      html += `${notationSym} ${o.option}=${o.count}`;
       html += `</span> `;
     });
     html += `</div>`;
@@ -743,47 +764,53 @@ async function loadResults() {
 function updateNoteStats(data) {
   const stats = document.getElementById('noteStats');
   
-  // Group by duration
-  const durationGroups = {
-    '1': { name: 'Whole', count: 0, notes: {}, beats: 4, symbol: '𝅝' },
-    '2': { name: 'Half', count: 0, notes: {}, beats: 2, symbol: '𝅗𝅥' },
-    '4': { name: 'Quarter', count: 0, notes: {}, beats: 1, symbol: '♩' },
-    '8': { name: 'Eighth', count: 0, notes: {}, beats: 0.5, symbol: '♪' }
+  // Group by sound mapping
+  const soundGroups = {
+    '0.5': { name: 'Eighth Sound', count: 0, notes: {}, beats: 0.5, class: 'eighth-sound' },
+    '1': { name: 'Quarter Sound', count: 0, notes: {}, beats: 1, class: 'quarter-sound' },
+    '2': { name: 'Half Sound', count: 0, notes: {}, beats: 2, class: 'half-sound' },
+    '4': { name: 'Whole Sound', count: 0, notes: {}, beats: 4, class: 'whole-sound' }
   };
   
   data.forEach(v => {
     const parsed = parseABCNote(v.option);
-    if (parsed && durationGroups[parsed.duration]) {
-      durationGroups[parsed.duration].count += v.count;
-      durationGroups[parsed.duration].notes[parsed.pitch] = 
-        (durationGroups[parsed.duration].notes[parsed.pitch] || 0) + v.count;
+    if (parsed) {
+      const soundBeats = soundMapping[parsed.duration];
+      if (soundGroups[soundBeats]) {
+        soundGroups[soundBeats].count += v.count;
+        soundGroups[soundBeats].notes[`${parsed.pitch}${parsed.duration}`] = 
+          (soundGroups[soundBeats].notes[`${parsed.pitch}${parsed.duration}`] || 0) + v.count;
+      }
     }
   });
   
   let statsHtml = '';
-  let totalBeats = 0;
+  let totalSoundBeats = 0;
   let totalVotes = 0;
   
-  // Create stats for each duration
-  Object.keys(durationGroups).forEach(duration => {
-    const group = durationGroups[duration];
+  // Create stats for each sound group
+  Object.keys(soundGroups).forEach(beats => {
+    const group = soundGroups[beats];
     if (group.count > 0) {
       totalVotes += group.count;
-      totalBeats += group.count * group.beats;
+      totalSoundBeats += group.count * group.beats;
       
       statsHtml += `
-        <div class="stat-card ${durationColor[duration]}">
-          <h4>${group.name} (${group.symbol})</h4>
+        <div class="stat-card ${group.class}">
+          <h4>${group.name}</h4>
           <div class="stat-number">${group.count}</div>
           <div style="font-size: 12px;">${group.beats} beat${group.beats !== 1 ? 's' : ''} each</div>
           <div style="font-size: 11px; margin-top: 5px; opacity: 0.8;">
-            ${Object.entries(group.notes).map(([pitch, count]) => 
-              `${pitch}:${count}`).join(' · ')}
+            ${Object.entries(group.notes).map(([note, count]) => 
+              `${note}:${count}`).join(' · ')}
           </div>
         </div>
       `;
     }
   });
+  
+  const quarterNoteDuration = 60 / tempo;
+  const totalSeconds = totalSoundBeats * quarterNoteDuration;
   
   // Add total summary
   statsHtml += `
@@ -795,12 +822,12 @@ function updateNoteStats(data) {
           <div class="stat-number">${totalVotes}</div>
         </div>
         <div>
-          <div>Total Beats</div>
-          <div class="stat-number" style="color: #9C27B0;">${totalBeats.toFixed(1)}</div>
+          <div>Total Sound Beats</div>
+          <div class="stat-number" style="color: #9C27B0;">${totalSoundBeats.toFixed(1)}</div>
         </div>
       </div>
       <div style="font-size: 11px; margin-top: 10px; color: #666;">
-        ♩ = ${tempo} BPM • Duration: ${(totalBeats * 60 / tempo).toFixed(1)} seconds
+        ♩ = ${tempo} BPM • Duration: ${totalSeconds.toFixed(1)} seconds
       </div>
     </div>
   `;
