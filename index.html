@@ -1,29 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Musical Poll D1</title>
-<script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
-<style>
-body { font-family: Arial; padding: 20px; max-width: 1000px; margin:auto; background:#f5f5f5; }
-h2 { text-align:center; color:#333; }
-button { padding:10px 20px; margin:5px; cursor:pointer; border:none; border-radius:6px; font-weight:bold; }
-.vote-btn { margin:5px; padding:8px 12px; border-radius:6px; font-weight:bold; }
-#abc-notation { background:#fff9e6; padding:20px; border-radius:8px; margin:15px 0; border:2px solid #4CAF50; min-height:150px; overflow-x:auto; }
-#notesSequence { background:#333; color:white; padding:15px; border-radius:8px; margin:15px 0; font-family:monospace; font-size:18px; text-align:center; letter-spacing:5px; }
-#poll-container { background:white; padding:20px; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.1); margin-bottom:20px; }
-#results { margin-top:20px; background:white; padding:20px; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
-#resetBtn { background:#f44336; color:white; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Musical Poll D1</title>
+    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1000px;
+            margin: auto;
+            background: #f5f5f5;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .vote-btn {
+            margin: 5px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            background-color: #4CAF50;
+            color: white;
+        }
+        .vote-btn:hover {
+            background-color: #45a049;
+        }
+        #abc-notation {
+            background: #fff9e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 2px solid #4CAF50;
+            min-height: 150px;
+            overflow-x: auto;
+        }
+        #notesSequence {
+            background: #333;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 18px;
+            text-align: center;
+            letter-spacing: 5px;
+        }
+        #poll-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        #results {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        #resetBtn {
+            background: #f44336;
+            color: white;
+        }
+        #resetBtn:hover {
+            background: #d32f2f;
+        }
+        .question-box {
+            padding: 10px;
+        }
+    </style>
 </head>
 <body>
 
 <h2>🎵 Live Musical Poll (D1) 🎵</h2>
 
 <div id="poll-container">Loading poll...</div>
+
 <div>
-<button id="resetBtn">⚠️ Reset All Votes</button>
+    <button id="resetBtn">⚠️ Reset All Votes</button>
 </div>
 
 <h3>🎼 Current Melody</h3>
@@ -32,166 +98,260 @@ button { padding:10px 20px; margin:5px; cursor:pointer; border:none; border-radi
 <div id="results">Loading results...</div>
 
 <script>
-const API = "https://api.sarunas.lat"; // <--- nomaini uz savu Worker URL
+    const API = "https://api.sarunas.lat"; // <--- nomaini uz savu Worker URL
 
-let questions = [];
-let currentQuestionIndex = 0;
-let melodyNotes = [];
-let voterId = localStorage.getItem("voterId");
-if(!voterId){ voterId='voter_'+Date.now(); localStorage.setItem("voterId", voterId); }
-
-let abcSynth = null;
-let audioContext = null;
-let visualObj = null;
-
-// ------------------
-// Load polls + options
-// ------------------
-async function loadPolls(){
-  try{
-    const res = await fetch(API+"/polls");
-    const polls = await res.json();
-
-    questions = [];
-    for(let poll of polls){
-      const optsRes = await fetch(API+"/options?poll_id="+poll.id);
-      const options = await optsRes.json();
-      questions.push({poll_id: poll.id, data_line: poll.data_line, options});
+    let questions = [];
+    let melodyNotes = [];
+    
+    // Voter ID no localStorage
+    let voterId = localStorage.getItem("voterId");
+    if (!voterId) {
+        voterId = 'voter_' + Date.now();
+        localStorage.setItem("voterId", voterId);
     }
 
-    currentQuestionIndex = 0;
-    showQuestion(currentQuestionIndex);
-    updateMelody();
-    showResults();
-  }catch(e){console.error(e);}
-}
+    // ABC.js sintēzes mainīgie
+    let abcSynth = null;
+    let audioContext = null;
+    let visualObj = null;
 
-// ------------------
-// Show one question
-// ------------------
-function showQuestion(q) {
-  const container = document.getElementById("poll-container");
-  container.innerHTML = ""; // notīrīt iepriekšējo
+    // ------------------
+    // Ielādē aptaujas + opcijas
+    // ------------------
+    async function loadPolls() {
+        try {
+            const res = await fetch(API + "/polls");
+            const polls = await res.json();
 
-  const box = document.createElement("div");
-  box.className = "question-box";
-  box.innerHTML = `<h3>Question ${q.id}</h3>`;
+            questions = [];
+            
+            for (let poll of polls) {
+                const optsRes = await fetch(API + "/options?poll_id=" + poll.id);
+                const options = await optsRes.json();
+                questions.push({
+                    poll_id: poll.id,
+                    data_line: poll.data_line,
+                    options: options
+                });
+            }
 
-  // Pārvērš options no string uz masīvu
-  const opts = q.options.option_text.split(',');
+            // Parāda pirmo aptauju
+            if (questions.length > 0) {
+                showQuestion(questions[0]);
+            } else {
+                document.getElementById("poll-container").innerHTML = "No polls available";
+            }
+            
+            updateMelody();
+            showResults();
+            
+        } catch (e) {
+            console.error("Error loading polls:", e);
+            document.getElementById("poll-container").innerHTML = "Error loading polls";
+        }
+    }
 
-  opts.forEach(opt => {
-    const btn = document.createElement("button");
-    btn.className = "vote-btn";
-    btn.textContent = opt;
-    btn.onclick = () => vote(q.id, opt);
-    box.appendChild(btn);
-  });
+    // ------------------
+    // Parāda vienu aptaujas jautājumu
+    // ------------------
+    function showQuestion(question) {
+        const container = document.getElementById("poll-container");
+        container.innerHTML = "";
 
-  container.appendChild(box);
-}
+        const box = document.createElement("div");
+        box.className = "question-box";
+        box.innerHTML = `<h3>Question ${question.poll_id}</h3>`;
 
+        // Pārbauda vai options eksistē un sadala tos
+        if (question.options && question.options.option_text) {
+            const opts = question.options.option_text.split(',');
+            
+            opts.forEach(opt => {
+                const btn = document.createElement("button");
+                btn.className = "vote-btn";
+                btn.textContent = opt.trim();
+                btn.onclick = () => vote(question.poll_id, opt.trim());
+                box.appendChild(btn);
+            });
+        } else {
+            box.innerHTML += "<p>No options available</p>";
+        }
 
-// ------------------
-// Vote
-// ------------------
-async function vote(poll_id, option_id, note){
-  try{
-    await fetch(API+"/vote",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({voter_id:voterId,poll_id,option_id})
-    });
-    melodyNotes.push(note);
-    updateMelody();
-    playLastNote(note);
-    loadPolls(); // refresh counts
-  }catch(e){console.error(e);}
-}
+        container.appendChild(box);
+    }
 
-// ------------------
-// Reset votes
-// ------------------
-document.getElementById("resetBtn").onclick = async ()=>{
-  const pwd = prompt("Enter admin password:");
-  if(!pwd) return;
-  try{
-    await fetch(API+"/admin/reset",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({password:pwd})
-    });
-    melodyNotes=[];
-    currentQuestionIndex=0;
-    await loadPolls();
-    alert("All votes reset!");
-  }catch(e){console.error(e);}
-}
+    // ------------------
+    // Balsošana
+    // ------------------
+    async function vote(poll_id, option) {
+        try {
+            const response = await fetch(API + "/vote", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    voter_id: voterId,
+                    poll_id: poll_id,
+                    option_id: option
+                })
+            });
 
-// ------------------
-// Update ABCJS melody
-// ------------------
-function updateMelody(){
-  if(!melodyNotes.length){ document.getElementById("notesSequence").textContent="No notes yet"; document.getElementById("abc-notation").innerHTML=""; return; }
-  const header=
-`X:1
+            if (!response.ok) {
+                throw new Error("Vote failed");
+            }
+
+            // Pievieno noti melodijai (pieņemot, ka opcija ir nots)
+            melodyNotes.push(option);
+            updateMelody();
+            await playLastNote(option);
+            
+            // Atsvaidzina rezultātus
+            await loadPolls();
+            
+        } catch (e) {
+            console.error("Error voting:", e);
+            alert("Failed to submit vote");
+        }
+    }
+
+    // ------------------
+    // Reset visas balsis
+    // ------------------
+    document.getElementById("resetBtn").onclick = async () => {
+        const pwd = prompt("Enter admin password:");
+        if (!pwd) return;
+        
+        try {
+            const response = await fetch(API + "/admin/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: pwd })
+            });
+
+            if (!response.ok) {
+                throw new Error("Reset failed");
+            }
+
+            melodyNotes = [];
+            await loadPolls();
+            updateMelody();
+            alert("All votes reset!");
+            
+        } catch (e) {
+            console.error("Error resetting:", e);
+            alert("Reset failed");
+        }
+    }
+
+    // ------------------
+    // Atjauno ABCJS melodiju
+    // ------------------
+    function updateMelody() {
+        const notesElement = document.getElementById("notesSequence");
+        const abcElement = document.getElementById("abc-notation");
+        
+        if (!melodyNotes.length) {
+            notesElement.textContent = "No notes yet";
+            abcElement.innerHTML = "";
+            return;
+        }
+
+        const header = `X:1
 T:Live Melody
 M:4/4
 L:1/4
 Q:1/4=120
 K:C
 `;
-  const body = melodyNotes.join(" ");
-  document.getElementById("notesSequence").textContent = melodyNotes.join(" | ");
-  document.getElementById("abc-notation").innerHTML="";
-  try{
-    visualObj = ABCJS.renderAbc("abc-notation", header+body)[0];
-  }catch(e){console.error(e);}
-}
+        const body = melodyNotes.join(" ");
+        
+        notesElement.textContent = melodyNotes.join(" | ");
+        abcElement.innerHTML = "";
+        
+        try {
+            visualObj = ABCJS.renderAbc("abc-notation", header + body)[0];
+        } catch (e) {
+            console.error("Error rendering ABC:", e);
+        }
+    }
 
-// ------------------
-// Play last voted note
-// ------------------
-async function playLastNote(note){
-  if(!audioContext) audioContext = new (window.AudioContext||window.webkitAudioContext)();
-  if(!abcSynth) abcSynth = new ABCJS.synth.CreateSynth();
-  const abcStr =
-`X:1
+    // ------------------
+    // Atskaņo pēdējo noti
+    // ------------------
+    async function playLastNote(note) {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        if (!abcSynth) {
+            abcSynth = new ABCJS.synth.CreateSynth();
+        }
+
+        const abcStr = `X:1
 T:Last Note
 M:4/4
 L:1/4
 Q:1/4=120
 K:C
 ` + note;
-  visualObj = ABCJS.renderAbc("abc-notation", abcStr)[0];
-  try{
-    await abcSynth.init({visualObj,audioContext});
-    await abcSynth.prime();
-    abcSynth.start();
-  }catch(e){console.error(e);}
-}
 
-// ------------------
-// Show vote results
-// ------------------
-function showResults(){
-  const resContainer = document.getElementById("results");
-  let html="";
-  for(let q of questions){
-    html+=`<strong>Question ${q.poll_id}</strong><br>`;
-    for(let opt of q.options){
-      html+=`${opt.option_text} = ${opt.votes}<br>`;
+        try {
+            visualObj = ABCJS.renderAbc("abc-notation", abcStr)[0];
+            await abcSynth.init({ visualObj, audioContext });
+            await abcSynth.prime();
+            abcSynth.start();
+            
+            // Aptur atskaņošanu pēc 2 sekundēm
+            setTimeout(() => {
+                if (abcSynth) {
+                    abcSynth.stop();
+                }
+            }, 2000);
+            
+        } catch (e) {
+            console.error("Error playing note:", e);
+        }
     }
-    html+="<br>";
-  }
-  resContainer.innerHTML = html || "No votes yet";
-}
 
-// ------------------
-// Init
-// ------------------
-loadPolls();
-setInterval(loadPolls,5000);
+    // ------------------
+    // Parāda balsošanas rezultātus
+    // ------------------
+    function showResults() {
+        const resContainer = document.getElementById("results");
+        
+        if (!questions.length) {
+            resContainer.innerHTML = "No votes yet";
+            return;
+        }
+
+        let html = "";
+        
+        for (let q of questions) {
+            html += `<strong>Question ${q.poll_id}</strong><br>`;
+            
+            if (q.options && Array.isArray(q.options)) {
+                for (let opt of q.options) {
+                    html += `${opt.option_text} = ${opt.votes || 0}<br>`;
+                }
+            } else if (q.options && q.options.option_text) {
+                // Ja options ir objekts, nevis masīvs
+                const opts = q.options.option_text.split(',');
+                for (let opt of opts) {
+                    html += `${opt.trim()} = 0<br>`;
+                }
+            }
+            
+            html += "<br>";
+        }
+        
+        resContainer.innerHTML = html;
+    }
+
+    // ------------------
+    // Inicializācija
+    // ------------------
+    loadPolls();
+    setInterval(loadPolls, 5000);
+
 </script>
 
 </body>
