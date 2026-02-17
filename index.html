@@ -7,8 +7,6 @@
 <style>
 body { font-family: Arial; background: #f4f4f4; padding: 30px; text-align: center; }
 button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 6px; border: none; cursor: pointer; }
-.yes { background: #4CAF50; color: white; }
-.no { background: #f44336; color: white; }
 .bar { height: 20px; width: 300px; background: #ddd; border-radius: 5px; margin: 10px auto; position: relative; }
 .fill { height: 100%; text-align: right; padding-right: 5px; color: white; line-height: 20px; border-radius: 5px; }
 .yes-fill { background: #4CAF50; }
@@ -25,48 +23,34 @@ const API = "https://api.sarunas.lat"; // replace with your Worker URL
 let questions = [];
 let currentIndex = 0;
 
-// Generate a persistent voter ID
 function getVoterId() {
   let id = localStorage.getItem("voter_id");
   if (!id) { id = crypto.randomUUID(); localStorage.setItem("voter_id", id); }
   return id;
 }
 
-// Load questions dynamically from /results
 async function loadQuestions() {
   const res = await fetch(API + "/results");
   const data = await res.json();
-  
-  // Group options by question_id
   const map = {};
   data.forEach(v => {
     if (!map[v.question_id]) map[v.question_id] = [];
     map[v.question_id].push({ option: v.option, count: v.count });
   });
-
   questions = Object.keys(map).map(id => ({ id, options: map[id] }));
   renderQuestion();
 }
 
-// Render the current question
 function renderQuestion() {
   const container = document.getElementById("question-container");
-  if (currentIndex >= questions.length) {
-    container.innerHTML = "<h3>Thank you for voting!</h3>";
-    showResults();
-    return;
-  }
+  if (currentIndex >= questions.length) { container.innerHTML = "<h3>Thank you for voting!</h3>"; showResults(); return; }
 
   const q = questions[currentIndex];
-  let html = `<h3>${q.id}</h3>`; // You can replace with actual question text if needed
-  q.options.forEach(o => {
-    html += `<button onclick="vote('${q.id}','${o.option}')">${o.option}</button>`;
-  });
-
+  let html = `<h3>${q.id}</h3>`; // or replace with actual question text
+  q.options.forEach(o => html += `<button onclick="vote('${q.id}','${o.option}')">${o.option}</button>`);
   container.innerHTML = html;
 }
 
-// Vote function
 async function vote(question_id, option) {
   const voter_id = getVoterId();
   const res = await fetch(API + "/vote", {
@@ -76,24 +60,19 @@ async function vote(question_id, option) {
   });
   const data = await res.json();
   if (data.error) { alert(data.error); return; }
-
   currentIndex++;
   renderQuestion();
 }
 
-// Show results at the end
 async function showResults() {
   const container = document.getElementById("question-container");
   const res = await fetch(API + "/results");
   const data = await res.json();
 
-  let html = "<h3>Results:</h3>";
   const grouped = {};
-  data.forEach(v => {
-    if (!grouped[v.question_id]) grouped[v.question_id] = [];
-    grouped[v.question_id].push(v);
-  });
+  data.forEach(v => { if (!grouped[v.question_id]) grouped[v.question_id] = []; grouped[v.question_id].push(v); });
 
+  let html = "<h3>Results:</h3>";
   Object.keys(grouped).forEach(qid => {
     html += `<p>${qid}</p>`;
     grouped[qid].forEach(opt => {
@@ -102,13 +81,10 @@ async function showResults() {
       html += `<div class="bar"><div class="fill ${opt.option.includes("yes")?"yes-fill":"no-fill"}" style="width:${percent}%">${opt.option}: ${percent}%</div></div>`;
     });
   });
-
   container.innerHTML = html;
 }
 
-// Initialize
 window.addEventListener("DOMContentLoaded", loadQuestions);
 </script>
-
 </body>
 </html>
