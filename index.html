@@ -314,7 +314,7 @@
             melodyNotes.push(option);
             updateMelody();
             
-            // Atskaņo tikko pievienoto noti/nošu frāzi
+            // Atskaņo tikko pievienoto nošu frāzi
             await playNotePhrase(option);
             
             votedQuestions.add(question_id);
@@ -327,10 +327,44 @@
     }
 
     // ------------------
-    // Atskaņo nošu frāzi (ignorē | un atstarpes)
+    // Aprēķina precīzu nošu ilgumu
+    // ------------------
+    function calculateNoteDuration(abcPhrase) {
+        // Noņem | simbolus un sadala pa notīm
+        const notes = abcPhrase.replace(/\|/g, ' ').split(/\s+/).filter(n => n.length > 0);
+        
+        let totalBeats = 0;
+        
+        notes.forEach(note => {
+            // ABC notācijā: C4 nozīmē ceturtdaļnots, C2 - pusnots, C8 - astotdaļnots utt.
+            // Pēdējais cipars norāda ilgumu: 1=vesela, 2=puse, 4=ceturtdaļa, 8=astotdaļa, 16=sešpadsmitdaļa
+            const match = note.match(/\d+$/);
+            if (match) {
+                const duration = parseInt(match[0]);
+                // Pārvērš uz ceturtdaļnotīm: 4 = 1 ceturtdaļnots, 2 = 2 ceturtdaļnotis, 8 = 0.5 ceturtdaļnotis
+                totalBeats += 4 / duration;
+            } else {
+                // Ja nav norādīts ilgums, pieņem ceturtdaļnoti
+                totalBeats += 1;
+            }
+        });
+        
+        // Pie 120 BPM, viena ceturtdaļnots ilgst 0.5 sekundes
+        // Pievienojam 0.5 sekundes klusuma beigās, lai pēdējā nots izskanētu līdz galam
+        return (totalBeats * 0.5) + 0.5;
+    }
+
+    // ------------------
+    // Atskaņo nošu frāzi
     // ------------------
     async function playNotePhrase(phrase) {
         if (!phrase) return;
+        
+        // Pārbauda vai frāze satur tikai | simbolus
+        if (phrase.replace(/\|/g, '').trim() === '') {
+            console.log("Only bar lines, nothing to play");
+            return;
+        }
         
         // Ja jau skan, aptur
         if (isPlaying && abcSynth) {
@@ -339,7 +373,7 @@
             } catch (e) {
                 console.log("Error stopping previous playback:", e);
             }
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 150));
         }
         
         if (!audioContext) {
@@ -351,12 +385,6 @@
             abcSynth = new ABCJS.synth.CreateSynth();
         }
 
-        // Pārbauda vai frāze satur tikai | simbolus
-        if (phrase.replace(/\|/g, '').trim() === '') {
-            console.log("Only bar lines, nothing to play");
-            return;
-        }
-
         const header = `X:1
 T:Note Phrase
 M:4/4
@@ -365,7 +393,7 @@ Q:1/4=120
 K:C
 `;
         
-        // Pievieno atstarpes ap | simboliem, lai ABCJS tos pareizi interpretētu
+        // Formatē frāzi ABCJS vajadzībām
         const formattedPhrase = phrase.replace(/\|/g, ' | ');
         const fullAbc = header + formattedPhrase;
 
@@ -396,9 +424,9 @@ K:C
             await abcSynth.prime();
             abcSynth.start();
             
-            // Aprēķina ilgumu pēc nošu skaita (izņemot | simbolus)
-            const notes = phrase.split('').filter(char => char !== '|' && char !== ' ').length;
-            const duration = Math.max(1, notes * 0.5); // Vismaz 1 sekunde
+            // Aprēķina precīzu ilgumu
+            const duration = calculateNoteDuration(phrase);
+            console.log(`Playing phrase for ${duration} seconds`);
             
             // Pēc ilguma aptur atskaņošanu
             setTimeout(() => {
@@ -444,7 +472,7 @@ K:C
             }
         }
         
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 150));
         
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -490,9 +518,13 @@ K:C
             await abcSynth.prime();
             abcSynth.start();
             
-            // Aprēķina ilgumu pēc nošu skaita
-            const allNotes = melodyNotes.join('').split('').filter(char => char !== '|' && char !== ' ').length;
-            const duration = Math.max(2, allNotes * 0.5);
+            // Aprēķina kopējo ilgumu visām frāzēm
+            let totalDuration = 0;
+            melodyNotes.forEach(phrase => {
+                totalDuration += calculateNoteDuration(phrase);
+            });
+            
+            console.log(`Playing full melody for ${totalDuration} seconds`);
             
             setTimeout(() => {
                 if (abcSynth && isPlaying) {
@@ -508,7 +540,7 @@ K:C
                         indicator.remove();
                     }
                 }
-            }, duration * 1000);
+            }, totalDuration * 1000);
             
         } catch (e) {
             console.error("Error playing melody:", e);
