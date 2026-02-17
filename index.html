@@ -412,7 +412,8 @@ function buildPollButtons(data) {
    ABC RENDERING
 =================================*/
 
-function votesToABC(data) {
+function votesToABC(data) function votesToABC(dataString) {
+
   let header =
 `X:1
 T:Database Notes
@@ -422,36 +423,44 @@ Q:1/4=${tempo}
 K:${currentKey}
 `;
 
-  const notes = [];
+  if (!dataString || typeof dataString !== "string")
+    return header + "z4 |]";
 
-  data.forEach(v => {
-  for (let i = 0; i < v.count; i++) {
-    abcBody += v.option + " | ";
-  }
-});
-
-
-  if (notes.length === 0) return header + "z4 |]";
+  // 1️⃣ Sadala abas atbildes
+  const answers = dataString.split(",");
 
   let body = "";
-  let beats = 0;
 
-  notes.forEach((note, i) => {
-    body += note + " ";
-    const parsed = parseABCNote(note);
-    beats += getNoteBeats(parsed?.duration);
+  answers.forEach((answer, index) => {
 
-    if (beats >= 4) {
+    // 2️⃣ Sadala taktis
+    const bars = answer.split("|");
+
+    bars.forEach(bar => {
+
+      // 3️⃣ Atrod notis kā E2, G4 utt
+      const notes = bar.match(/[A-Ga-g][0-9]/g) || [];
+
+      notes.forEach(n => {
+        const pitch = n[0];
+        const duration = n[1];
+
+        body += pitch + duration + " ";
+      });
+
       body += "| ";
-      beats = 0;
-    }
+    });
+
+    // pauze starp melodijām
+    if (index < answers.length - 1)
+      body += "z4 | ";
   });
 
-  document.getElementById("notesSequence").textContent =
-    notes.length ? notes.join(" ") : "No notes yet";
+  document.getElementById("notesSequence").textContent = dataString;
 
   return header + body;
 }
+
 
 function updateMusic() {
   const abc = votesToABC(currentVoteData);
