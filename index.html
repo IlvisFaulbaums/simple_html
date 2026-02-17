@@ -3,88 +3,100 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Step-by-Step Poll</title>
+<title>Dynamic Poll</title>
 <style>
-body { font-family: Arial; background: #f4f4f4; padding: 30px; text-align: center; }
-button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 6px; border: none; cursor: pointer; }
-.bar { height: 20px; width: 300px; background: #ddd; border-radius: 5px; margin: 10px auto; position: relative; }
-.fill { height: 100%; text-align: right; padding-right: 5px; color: white; line-height: 20px; border-radius: 5px; }
-.yes-fill { background: #4CAF50; }
-.no-fill { background: #f44336; }
+body { font-family: Arial; padding: 20px; max-width: 600px; margin: auto; }
+h2 { text-align: center; }
+button { padding: 8px 15px; margin: 5px; }
+#results { margin-top: 20px; }
 </style>
 </head>
 <body>
 
-<h2>Step-by-Step Poll</h2>
-<div id="question-container">Loading...</div>
+<h2>Vote on the Poll</h2>
+<div id="poll-container"></div>
+
+<h3 id="results">Loading results...</h3>
 
 <script>
-const API = "https://api.sarunas.lat"; // replace with your Worker URL
-let questions = [];
-let currentIndex = 0;
+const API = "https://api.sarunas.lat"; // Your Worker URL
 
-function getVoterId() {
-  let id = localStorage.getItem("voter_id");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("voter_id", id); }
-  return id;
+// Generate a random voter ID for simplicity (or use login/session)
+let voterId = localStorage.getItem("voterId");
+if (!voterId) {
+  voterId = 'voter_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+  localStorage.setItem("voterId", voterId);
 }
 
+// Load questions dynamically
 async function loadQuestions() {
   const res = await fetch(API + "/results");
   const data = await res.json();
-  const map = {};
-  data.forEach(v => {
-    if (!map[v.question_id]) map[v.question_id] = [];
-    map[v.question_id].push({ option: v.option, count: v.count });
+
+  // Group by question
+  const questions = {};
+  data.forEach(item => {
+    if (!questions[item.question_id]) questions[item.question_id] = [];
+    questions[item.question_id].push(item.option);
   });
-  questions = Object.keys(map).map(id => ({ id, options: map[id] }));
-  renderQuestion();
+
+  const container = document.getElementById("poll-container");
+  container.innerHTML = "";
+
+  for (const qid in questions) {
+    const div = document.createElement("div");
+    div.innerHTML = `<h3>${qid}</h3>`; // or you can replace qid with actual question text if CSV has text
+    questions[qid].forEach(opt => {
+      const btn = document.createElement("button");
+      btn.innerText = opt;
+      btn.onclick = () => vote(qid, opt);
+      div.appendChild(btn);
+    });
+    container.appendChild(div);
+  }
+
+  loadResults();
 }
 
-function renderQuestion() {
-  const container = document.getElementById("question-container");
-  if (currentIndex >= questions.length) { container.innerHTML = "<h3>Thank you for voting!</h3>"; showResults(); return; }
-
-  const q = questions[currentIndex];
-  let html = `<h3>${q.id}</h3>`; // or replace with actual question text
-  q.options.forEach(o => html += `<button onclick="vote('${q.id}','${o.option}')">${o.option}</button>`);
-  container.innerHTML = html;
-}
-
-async function vote(question_id, option) {
-  const voter_id = getVoterId();
+// Vote function
+async function vote(questionId, option) {
   const res = await fetch(API + "/vote", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ voter_id, question_id, option })
+    body: JSON.stringify({ voter_id: voterId, question_id: questionId, option })
   });
+
   const data = await res.json();
-  if (data.error) { alert(data.error); return; }
-  currentIndex++;
-  renderQuestion();
+  if (data.error) alert(data.error);
+  loadResults();
 }
 
-async function showResults() {
-  const container = document.getElementById("question-container");
+// Load live results
+async function loadResults() {
   const res = await fetch(API + "/results");
   const data = await res.json();
 
+  // Group results by question
   const grouped = {};
-  data.forEach(v => { if (!grouped[v.question_id]) grouped[v.question_id] = []; grouped[v.question_id].push(v); });
-
-  let html = "<h3>Results:</h3>";
-  Object.keys(grouped).forEach(qid => {
-    html += `<p>${qid}</p>`;
-    grouped[qid].forEach(opt => {
-      const total = grouped[qid].reduce((a,b) => a+b.count, 0);
-      const percent = total ? ((opt.count/total)*100).toFixed(1) : 0;
-      html += `<div class="bar"><div class="fill ${opt.option.includes("yes")?"yes-fill":"no-fill"}" style="width:${percent}%">${opt.option}: ${percent}%</div></div>`;
-    });
+  data.forEach(v => {
+    if (!grouped[v.question_id]) grouped[v.question_id] = [];
+    grouped[v.question_id].push(v);
   });
-  container.innerHTML = html;
+
+  let text = "";
+  for (const qid in grouped) {
+    text += qid + ": ";
+    grouped[qid].forEach(o => { text += `${o.option}=${o.count} | `; });
+    text += "\n";
+  }
+  document.getElementById("results").innerText = text;
 }
 
-window.addEventListener("DOMContentLoaded", loadQuestions);
+// Auto-refresh every 5 seconds
+setInterval(loadResults, 5000);
+
+// Initial load
+loadQuestions();
 </script>
 </body>
 </html>
