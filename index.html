@@ -306,9 +306,8 @@ button:active {
 <div id="results">Loading results...</div>
 
 <script>
-const API = "https://api.sarunas.lat"; // Your Worker URL
+const API = "https://api.sarunas.lat";
 
-// Audio context for ABCJS
 let audioContext = null;
 let isPlaying = false;
 let volume = 0.7;
@@ -319,522 +318,233 @@ let abcSynth = null;
 let visualObj = null;
 let playbackTimeout = null;
 
-// Generate a random voter ID
 let voterId = localStorage.getItem("voterId");
 if (!voterId) {
-  voterId = 'voter_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+  voterId = 'voter_' + Date.now();
   localStorage.setItem("voterId", voterId);
 }
 
-// Note symbols for display
-const notationSymbol = {
-  '1': '𝅝',  // Whole note
-  '2': '𝅗𝅥',  // Half note
-  '4': '♩',  // Quarter note
-  '8': '♪'   // Eighth note
-};
+/* ===============================
+   SAFE HELPERS
+=================================*/
 
-// Note duration in beats
-function getNoteBeats(duration) {
-  switch(duration) {
-    case '1': return 4;  // Whole note
-    case '2': return 2;  // Half note
-    case '4': return 1;  // Quarter note
-    case '8': return 0.5; // Eighth note
-    default: return 1;
+function safeArray(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map(item => ({
+    question_id: item.question_id ?? 0,
+    option: item.option ?? "",
+    count: parseInt(item.count ?? 0)
+  }));
+}
+
+function parseABCNote(note) {
+  const match = note.match(/^([A-Ga-g])(\d)$/);
+  if (!match) return null;
+  return { pitch: match[1], duration: match[2] };
+}
+
+function getNoteBeats(d) {
+  if (d === "1") return 4;
+  if (d === "2") return 2;
+  if (d === "4") return 1;
+  if (d === "8") return 0.5;
+  return 1;
+}
+
+/* ===============================
+   LOAD DATA
+=================================*/
+
+async function loadQuestions() {
+  try {
+    const res = await fetch(API + "/results");
+    const raw = await res.json();
+    const data = safeArray(raw);
+
+    currentVoteData = data;
+
+    buildPollButtons(data);
+    updateMusic();
+    loadResults();
+
+  } catch (e) {
+    console.error(e);
   }
 }
 
-// Parse ABC note notation (e.g., "C2" -> { pitch: 'C', duration: '2' })
-function parseABCNote(abcNote) {
-  const match = abcNote.match(/([A-G])(\d+)/);
-  if (match) {
-    return {
-      pitch: match[1],
-      duration: match[2],
-      full: abcNote
-    };
-  }
-  return null;
+/* ===============================
+   BUILD POLL BUTTONS
+=================================*/
+
+function buildPollButtons(data) {
+  const container = document.getElementById("poll-container");
+  container.innerHTML = "<h3>Available Notes to Vote:</h3>";
+
+  const grouped = {};
+
+  data.forEach(item => {
+    if (!grouped[item.question_id])
+      grouped[item.question_id] = new Set();
+    grouped[item.question_id].add(item.option);
+  });
+
+  Object.keys(grouped).forEach(qid => {
+    const box = document.createElement("div");
+    box.className = "question-box";
+    box.innerHTML = `<h3>Question ${qid}</h3>`;
+
+    grouped[qid].forEach(option => {
+      const parsed = parseABCNote(option);
+      if (!parsed) return;
+
+      const btn = document.createElement("button");
+      btn.className = "vote-btn";
+      btn.textContent = option;
+      btn.onclick = () => vote(qid, option);
+      box.appendChild(btn);
+    });
+
+    container.appendChild(box);
+  });
 }
 
-// Initialize audio context
-async function initAudio() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume();
-  }
-  return audioContext;
-}
+/* ===============================
+   ABC RENDERING
+=================================*/
 
-// Update tempo
-function updateTempo() {
-  tempo = parseInt(document.getElementById('tempo').value);
-  document.getElementById('tempoValue').textContent = tempo;
-  updateMusicScore();
-  updateTotalSummary();
-}
-
-// Update volume
-function updateVolume() {
-  volume = parseFloat(document.getElementById('volume').value);
-  if (abcSynth) {
-    abcSynth.setVolume(volume);
-  }
-}
-
-// Update key signature
-function updateKey() {
-  currentKey = document.getElementById('key-signature').value;
-  updateMusicScore();
-}
-
-// Convert ALL votes to ABC notation (expanded by count)
 function votesToABC(data) {
-  let abcHeader = `X:1\nT:All Notes from Database\nC:Live Poll\nM:4/4\nL:1/4\nQ:1/4=${tempo}\nK:${currentKey}\n`;
-  
-  // Collect ALL notes from votes (expanded by count)
-  const allNotes = [];
+  let header =
+`X:1
+T:Database Notes
+M:4/4
+L:1/4
+Q:1/4=${tempo}
+K:${currentKey}
+`;
+
+  const notes = [];
+
   data.forEach(v => {
     for (let i = 0; i < v.count; i++) {
-      allNotes.push(v.option);
+      notes.push(v.option);
     }
   });
-  
-  if (allNotes.length === 0) {
-    return abcHeader + "z4 |]"; // Quarter rest if no votes
-  }
-  
-  // Update the sequence display
-  document.getElementById('notesSequence').innerHTML = '🎵 ' + allNotes.join(' ') + ' 🎵';
-  
-  // Create ABC notation
-  let abcBody = '';
-  let currentMeasureBeats = 0;
-  
-  allNotes.forEach((note, index) => {
-    abcBody += note + ' ';
-    
-    // Calculate beats for bar lines
+
+  if (notes.length === 0) return header + "z4 |]";
+
+  let body = "";
+  let beats = 0;
+
+  notes.forEach((note, i) => {
+    body += note + " ";
     const parsed = parseABCNote(note);
-    let beats = 1;
-    if (parsed) {
-      beats = getNoteBeats(parsed.duration);
-    }
-    currentMeasureBeats += beats;
-    
-    // Add bar line when measure is full (4 beats) or at the end
-    if (currentMeasureBeats >= 3.99 || index === allNotes.length - 1) {
-      abcBody += '| ';
-      currentMeasureBeats = 0;
+    beats += getNoteBeats(parsed?.duration);
+
+    if (beats >= 4) {
+      body += "| ";
+      beats = 0;
     }
   });
-  
-  return abcHeader + abcBody;
+
+  document.getElementById("notesSequence").textContent =
+    notes.length ? notes.join(" ") : "No notes yet";
+
+  return header + body;
 }
 
-// Calculate total duration in seconds
-function calculateTotalDuration(voteData) {
-  const quarterNoteDuration = 60 / tempo; // seconds per quarter note
-  
-  let totalBeats = 0;
-  
-  voteData.forEach(v => {
-    const parsed = parseABCNote(v.option);
-    if (parsed) {
-      totalBeats += getNoteBeats(parsed.duration) * v.count;
-    }
-  });
-  
-  return totalBeats * quarterNoteDuration;
-}
-
-// Update music score display
-function updateMusicScore() {
-  if (currentVoteData.length > 0) {
-    const abcNotation = votesToABC(currentVoteData);
-    renderABC(abcNotation);
-  }
-}
-
-// Render ABC notation
-function renderABC(abcNotation) {
-  const visualOptions = {
-    paddingtop: 20,
-    paddingbottom: 20,
-    paddingleft: 20,
-    paddingright: 20,
-    staffwidth: 800,
-    responsive: 'resize'
-  };
-  
-  // Clear previous content
-  document.getElementById('abc-notation').innerHTML = '';
-  
-  // Render the notation
+function updateMusic() {
+  const abc = votesToABC(currentVoteData);
+  document.getElementById("abc-notation").innerHTML = "";
   try {
-    visualObj = ABCJS.renderAbc(
-      'abc-notation', 
-      abcNotation, 
-      visualOptions
-    )[0];
+    visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
   } catch (e) {
-    console.error("ABC rendering error:", e);
-    document.getElementById('abc-notation').innerHTML = '<p style="color: red">Error rendering notation</p>';
+    console.error(e);
   }
 }
 
-// Play ALL notes using ABCJS synthesizer
+/* ===============================
+   PLAYBACK
+=================================*/
+
 async function playAllNotes() {
-  if (isPlaying) {
-    stopPlayback();
-    return;
-  }
-  
-  if (!currentVoteData || currentVoteData.length === 0) {
-    alert("No notes to play yet. Add some votes first!");
-    return;
-  }
-  
-  // Count total notes
-  const totalNotes = currentVoteData.reduce((sum, v) => sum + v.count, 0);
-  
-  // Update button states
-  document.getElementById('playBtn').disabled = true;
-  document.getElementById('stopBtn').disabled = false;
-  
-  isPlaying = true;
-  document.getElementById('playback-status').innerHTML = `Initializing playback of ${totalNotes} notes...`;
-  
-  try {
-    // Initialize audio context
-    await initAudio();
-    
-    // Get the ABC notation with ALL notes
-    const abcNotation = votesToABC(currentVoteData);
-    
-    // Render and get visual object
-    visualObj = ABCJS.renderAbc('abc-notation', abcNotation, {
-      responsive: 'resize',
-      add_classes: true
-    })[0];
-    
-    // Create synth if needed
-    if (!abcSynth) {
-      abcSynth = new ABCJS.synth.CreateSynth();
-    }
-    
-    // Initialize the synthesizer
-    document.getElementById('playback-status').innerHTML = 'Loading sound fonts...';
-    
-    await abcSynth.init({
-      visualObj: visualObj,
-      options: {
-        soundFontUrl: 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/',
-        audioContext: audioContext,
-        millisecondsPerMeasure: (60000 / tempo) * 4 // Convert BPM to ms per measure
-      }
-    });
-    
-    // Set volume
-    abcSynth.setVolume(volume);
-    
-    // Prime and play
-    document.getElementById('playback-status').innerHTML = 'Priming...';
-    await abcSynth.prime();
-    
-    document.getElementById('playback-status').innerHTML = `▶️ Playing ${totalNotes} notes from database...`;
-    abcSynth.start();
-    
-    // Calculate total duration for auto-stop
-    const totalDuration = calculateTotalDuration(currentVoteData) * 1000; // Convert to ms
-    const minutes = Math.floor(totalDuration / 60000);
-    const seconds = ((totalDuration % 60000) / 1000).toFixed(1);
-    
-    document.getElementById('playback-status').innerHTML += ` (Duration: ${minutes}:${seconds.padStart(4, '0')})`;
-    
-    // Auto-stop after duration
-    if (playbackTimeout) clearTimeout(playbackTimeout);
-    playbackTimeout = setTimeout(() => {
-      if (isPlaying) {
-        stopPlayback();
-        document.getElementById('playback-status').innerHTML = '✅ Playback complete - all notes played';
-      }
-    }, totalDuration);
-    
-  } catch (error) {
-    console.error("ABCJS playback error:", error);
-    document.getElementById('playback-status').innerHTML = '❌ Error playing: ' + error.message;
-    stopPlayback();
-  }
-}
+  if (!currentVoteData.length) return;
 
-// Stop playback
-function stopPlayback() {
-  isPlaying = false;
-  
-  if (playbackTimeout) {
-    clearTimeout(playbackTimeout);
-    playbackTimeout = null;
-  }
-  
-  if (abcSynth) {
-    try {
-      abcSynth.stop();
-    } catch (e) {
-      console.log("Stop error:", e);
-    }
-  }
-  
-  document.getElementById('playBtn').disabled = false;
-  document.getElementById('stopBtn').disabled = true;
-  document.getElementById('playback-status').innerHTML = '⏹️ Stopped';
-}
+  if (!audioContext)
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-// Update total summary
-function updateTotalSummary() {
-  if (!currentVoteData || currentVoteData.length === 0) {
-    document.getElementById('totalSummary').innerHTML = 'No votes yet';
-    return;
-  }
-  
-  const totalNotes = currentVoteData.reduce((sum, v) => sum + v.count, 0);
-  const totalDuration = calculateTotalDuration(currentVoteData);
-  const minutes = Math.floor(totalDuration / 60);
-  const seconds = (totalDuration % 60).toFixed(1);
-  
-  document.getElementById('totalSummary').innerHTML = `
-    🎵 Total: ${totalNotes} notes | ⏱️ Duration: ${minutes}:${seconds.padStart(4, '0')} at ♩=${tempo} BPM
-  `;
-}
+  if (!abcSynth)
+    abcSynth = new ABCJS.synth.CreateSynth();
 
-// Load questions and all data from database
-async function loadQuestions() {
-  const res = await fetch(API + "/results");
-  const data = await res.json();
+  const abc = votesToABC(currentVoteData);
+  visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
 
-  // Store current vote data
-  currentVoteData = data;
-
-  // Group by question for display
-  const questions = {};
-  data.forEach(item => {
-    if (!questions[item.question_id]) questions[item.question_id] = [];
-    questions[item.question_id].push(item.option);
+  await abcSynth.init({
+    visualObj,
+    audioContext
   });
 
-  const container = document.getElementById("poll-container");
-  container.innerHTML = "<h3 style='margin-top:0;'>Available Notes to Vote:</h3>";
-
-  for (const qid in questions) {
-    const div = document.createElement("div");
-    div.className = "question-box";
-    div.innerHTML = `<h3>Question ${qid}</h3>`;
-    
-    questions[qid].forEach(opt => {
-      const parsed = parseABCNote(opt);
-      if (!parsed) return;
-      
-      const btn = document.createElement("button");
-      
-      // Set button class based on note duration
-      let durationClass = 'quarter-note';
-      if (parsed.duration === '1') durationClass = 'whole-note';
-      else if (parsed.duration === '2') durationClass = 'half-note';
-      else if (parsed.duration === '4') durationClass = 'quarter-note';
-      else if (parsed.duration === '8') durationClass = 'eighth-note';
-      
-      btn.className = `vote-btn ${durationClass}`;
-      
-      // Show note info
-      const notationSym = notationSymbol[parsed.duration] || '♩';
-      const beats = getNoteBeats(parsed.duration);
-      
-      let beatText = beats === 1 ? '1 beat' : `${beats} beats`;
-      if (beats === 0.5) beatText = '½ beat';
-      
-      btn.innerHTML = `${notationSym} ${parsed.pitch} <span style="font-size: 9px;">(${beatText})</span>`;
-      
-      btn.onclick = () => vote(qid, opt);
-      
-      div.appendChild(btn);
-    });
-    container.appendChild(div);
-  }
-
-  // Update everything with the data
-  const abcNotation = votesToABC(data);
-  renderABC(abcNotation);
-  updateNoteStats(data);
-  updateTotalSummary();
-  loadResults();
+  await abcSynth.prime();
+  abcSynth.start();
 }
 
-// Vote function
-async function vote(questionId, option) {
-  const res = await fetch(API + "/vote", {
+function stopPlayback() {
+  if (abcSynth) abcSynth.stop();
+}
+
+/* ===============================
+   VOTE
+=================================*/
+
+async function vote(qid, option) {
+  await fetch(API + "/vote", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ voter_id: voterId, question_id: questionId, option })
+    body: JSON.stringify({
+      voter_id: voterId,
+      question_id: qid,
+      option
+    })
   });
 
-  const data = await res.json();
-  if (data.error) alert(data.error);
-  
-  // Reload everything
   loadQuestions();
 }
 
-// Load live results
+/* ===============================
+   RESULTS DISPLAY
+=================================*/
+
 async function loadResults() {
   const res = await fetch(API + "/results");
-  const data = await res.json();
+  const raw = await res.json();
+  const data = safeArray(raw);
 
-  // Group results by question
   const grouped = {};
   data.forEach(v => {
-    if (!grouped[v.question_id]) grouped[v.question_id] = [];
+    if (!grouped[v.question_id])
+      grouped[v.question_id] = [];
     grouped[v.question_id].push(v);
   });
 
   let html = "";
-  for (const qid in grouped) {
-    html += `<div style="margin-bottom: 15px;">`;
-    html += `<strong>Question ${qid}:</strong><br>`;
-    
-    grouped[qid].forEach(o => { 
-      const parsed = parseABCNote(o.option);
-      
-      let notationSym = '♩';
-      let bgClass = 'quarter-bg';
-      let beats = 1;
-      
-      if (parsed) {
-        notationSym = notationSymbol[parsed.duration] || '♩';
-        beats = getNoteBeats(parsed.duration);
-        
-        if (parsed.duration === '1') bgClass = 'whole-bg';
-        else if (parsed.duration === '2') bgClass = 'half-bg';
-        else if (parsed.duration === '4') bgClass = 'quarter-bg';
-        else if (parsed.duration === '8') bgClass = 'eighth-bg';
-      }
-      
-      let beatText = beats === 1 ? '1 beat' : `${beats} beats`;
-      if (beats === 0.5) beatText = '½ beat';
-      
-      html += `<span class="${bgClass}" style="display: inline-block; margin: 5px; padding: 5px 10px; border-radius: 4px; color: white; font-size: 14px;" title="${beatText}">`;
-      html += `${notationSym} ${o.option} = ${o.count}`;
-      html += `</span> `;
+  Object.keys(grouped).forEach(qid => {
+    html += `<strong>Question ${qid}</strong><br>`;
+    grouped[qid].forEach(v => {
+      html += `${v.option} = ${v.count}<br>`;
     });
-    html += `</div>`;
-  }
-  
-  if (html === "") {
-    html = "No votes yet";
-  }
-  
-  document.getElementById("results").innerHTML = html;
+    html += "<br>";
+  });
+
+  document.getElementById("results").innerHTML =
+    html || "No votes yet";
 }
 
-// Update note statistics
-function updateNoteStats(data) {
-  const stats = document.getElementById('noteStats');
-  
-  // Group by note duration
-  const durationGroups = {
-    '1': { name: 'Whole Notes', count: 0, notes: {}, beats: 4, class: 'whole-note' },
-    '2': { name: 'Half Notes', count: 0, notes: {}, beats: 2, class: 'half-note' },
-    '4': { name: 'Quarter Notes', count: 0, notes: {}, beats: 1, class: 'quarter-note' },
-    '8': { name: 'Eighth Notes', count: 0, notes: {}, beats: 0.5, class: 'eighth-note' }
-  };
-  
-  data.forEach(v => {
-    const parsed = parseABCNote(v.option);
-    if (parsed && durationGroups[parsed.duration]) {
-      durationGroups[parsed.duration].count += v.count;
-      durationGroups[parsed.duration].notes[`${parsed.pitch}${parsed.duration}`] = 
-        (durationGroups[parsed.duration].notes[`${parsed.pitch}${parsed.duration}`] || 0) + v.count;
-    }
-  });
-  
-  let statsHtml = '';
-  let totalBeats = 0;
-  let totalVotes = 0;
-  
-  // Create stats for each duration group
-  Object.keys(durationGroups).forEach(duration => {
-    const group = durationGroups[duration];
-    if (group.count > 0) {
-      totalVotes += group.count;
-      totalBeats += group.count * group.beats;
-      
-      statsHtml += `
-        <div class="stat-card ${group.class}">
-          <h4>${group.name}</h4>
-          <div class="stat-number">${group.count}</div>
-          <div style="font-size: 11px;">${group.beats} beat${group.beats !== 1 ? 's' : ''} each</div>
-          <div style="font-size: 10px; margin-top: 5px; color: #666;">
-            ${Object.entries(group.notes).map(([note, count]) => 
-              `${note}:${count}`).join(' · ')}
-          </div>
-        </div>
-      `;
-    }
-  });
-  
-  const quarterNoteDuration = 60 / tempo;
-  const totalSeconds = totalBeats * quarterNoteDuration;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = (totalSeconds % 60).toFixed(1);
-  
-  // Add total summary
-  statsHtml += `
-    <div class="stat-card" style="border-top: 4px solid #333; grid-column: span 2;">
-      <h4>Database Summary</h4>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <div>
-          <div>Total Notes</div>
-          <div class="stat-number">${totalVotes}</div>
-        </div>
-        <div>
-          <div>Total Beats</div>
-          <div class="stat-number" style="color: #9C27B0;">${totalBeats.toFixed(1)}</div>
-        </div>
-      </div>
-      <div style="font-size: 12px; margin-top: 10px; color: #666;">
-        ♩ = ${tempo} BPM • Duration: ${minutes}:${seconds.padStart(4, '0')}
-      </div>
-    </div>
-  `;
-  
-  stats.innerHTML = statsHtml;
-}
+/* ===============================
+   INIT
+=================================*/
 
-// Auto-refresh every 5 seconds (but don't interrupt playback)
-setInterval(() => { 
-  if (!isPlaying) {
-    loadQuestions(); 
-  }
-}, 5000);
-
-// Initial load
 loadQuestions();
-
-// Initialize audio on first click
-document.addEventListener('click', function initAudioOnFirstClick() {
-  initAudio();
-  document.removeEventListener('click', initAudioOnFirstClick);
-}, { once: true });
-
-// Clean up on page unload
-window.addEventListener('beforeunload', function() {
-  stopPlayback();
-  if (audioContext) {
-    audioContext.close();
-  }
-});
+setInterval(loadQuestions, 5000);
 </script>
+
 </body>
 </html>
