@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Poll Dashboard</title>
+<title>Admin Dashboard</title>
 <style>
-body { font-family: Arial; text-align: center; background: #f4f4f4; padding: 30px; }
-input, button { padding: 10px; font-size: 16px; margin: 5px; }
-table { border-collapse: collapse; margin: 20px auto; width: 80%; }
-th, td { border: 1px solid #ccc; padding: 10px; }
-button.reset { background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer; }
+body { font-family: Arial; padding: 20px; max-width: 800px; margin: auto; }
+input, button { padding: 8px 12px; margin: 5px; }
+table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+button.reset { background: #f44336; color: white; border: none; cursor: pointer; border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -27,7 +27,7 @@ button.reset { background: #f44336; color: white; border: none; border-radius: 6
 </div>
 
 <script>
-const API = "https://api.sarunas.lat"; // replace with your Worker URL
+const API = "https://api.sarunas.lat"; // Worker URL
 let password = "";
 
 // Login
@@ -49,7 +49,7 @@ async function login() {
   loadResults();
 }
 
-// Load votes
+// Load votes dynamically
 async function loadResults() {
   const res = await fetch(API + "/admin/results", {
     method: "POST",
@@ -79,14 +79,15 @@ async function loadResults() {
   document.getElementById("results").innerHTML = html;
 }
 
-// Reset votes
+// Reset votes and reload from CSV
 async function resetVotes() {
-  if (!confirm("Reset all votes?")) return;
+  if (!confirm("Reset all votes and questions?")) return;
   const res = await fetch(API + "/admin/reset", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({password})
   });
+
   const data = await res.json();
   if (data.success) { alert(data.message); loadResults(); }
   else alert(data.error);
@@ -95,6 +96,5 @@ async function resetVotes() {
 // Auto-refresh every 5 seconds
 setInterval(() => { if (password) loadResults(); }, 5000);
 </script>
-
 </body>
 </html>
