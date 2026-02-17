@@ -22,40 +22,44 @@ button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 6px; b
 <div id="poll"></div>
 
 <script>
-const API = "https://api.sarunas.lat"; // <-- Replace with your Worker URL
+const API = "https://api.sarunas.lat"; // <-- Your Worker URL
 
-// Define questions
+// Define your questions
 const questions = [
   { id: "q1", text: "Do you like this site?" },
   { id: "q2", text: "Do you enjoy polls?" },
   { id: "q3", text: "Do you want more questions?" }
 ];
 
-// Generate/get voter ID per browser
+// Generate or retrieve a unique voter ID per browser/device
 function getVoterId() {
   let id = localStorage.getItem("voter_id");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("voter_id", id); }
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("voter_id", id);
+  }
   return id;
 }
 
-// Render all questions
+// Render all questions and results
 async function renderPoll() {
   const container = document.getElementById("poll");
-  container.innerHTML = "";
+  container.innerHTML = "<p>Loading...</p>";
 
   try {
     const res = await fetch(API + "/results");
     const data = await res.json();
 
+    let html = "";
     for (let q of questions) {
       const votes = data.filter(v => v.question_id === q.id);
-      let yes = votes.find(v => v.option === "yes")?.count || 0;
-      let no = votes.find(v => v.option === "no")?.count || 0;
-      let total = yes + no;
-      let yesPercent = total ? ((yes / total) * 100).toFixed(1) : 0;
-      let noPercent = total ? ((no / total) * 100).toFixed(1) : 0;
+      const yes = votes.find(v => v.option === "yes")?.count || 0;
+      const no = votes.find(v => v.option === "no")?.count || 0;
+      const total = yes + no;
+      const yesPercent = total ? ((yes / total) * 100).toFixed(1) : 0;
+      const noPercent = total ? ((no / total) * 100).toFixed(1) : 0;
 
-      container.innerHTML += `
+      html += `
         <div class="question">
           <h3>${q.text}</h3>
           <button class="yes" onclick="vote('${q.id}','yes')">Yes</button>
@@ -67,39 +71,45 @@ async function renderPoll() {
       `;
     }
 
+    container.innerHTML = html;
+
   } catch(e) {
-    container.innerHTML = "<p>Error loading poll results.</p>";
+    container.innerHTML = "<p>Error loading poll results</p>";
   }
 }
 
 // Submit a vote
 async function vote(question_id, option) {
   try {
+    const body = {
+      voter_id: getVoterId(),
+      question_id,
+      option
+    };
+
     const res = await fetch(API + "/vote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        voter_id: getVoterId(),
-        question_id,
-        option
-      })
+      body: JSON.stringify(body)
     });
 
     const data = await res.json();
     if (data.error) {
-      alert(data.error); // blocks double voting
+      alert(data.error); // prevents double voting
     }
 
-    renderPoll();
+    renderPoll(); // refresh after vote
 
-  } catch (err) {
+  } catch(err) {
     alert("Error submitting vote");
   }
 }
 
-// Initial render + auto-refresh every 2 seconds
-renderPoll();
-setInterval(renderPoll, 2000);
+// Run when DOM is ready
+window.addEventListener("DOMContentLoaded", () => {
+  renderPoll();
+  setInterval(renderPoll, 2000); // auto-refresh every 2 sec
+});
 </script>
 
 </body>
