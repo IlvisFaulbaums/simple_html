@@ -130,6 +130,12 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -143,9 +149,10 @@
     </div>
 </div>
 
-<div>
+<div class="controls">
     <button id="resetBtn">⚠️ Reset All Votes</button>
     <button id="playFullBtn" style="background-color: #4CAF50; color: white;">▶ Play Full Melody</button>
+    <button id="stopBtn" style="background-color: #ff9800; color: white;">⏹ Stop</button>
 </div>
 
 <h3>🎼 Current Melody</h3>
@@ -161,6 +168,8 @@
     let melodyNotes = [];
     let votedQuestions = new Set();
     let isPlaying = false;
+    let currentSynth = null;
+    let audioContext = null;
     
     // Voter ID no localStorage
     let voterId = localStorage.getItem("voterId");
@@ -168,11 +177,6 @@
         voterId = 'voter_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem("voterId", voterId);
     }
-
-    // ABC.js sintēzes mainīgie
-    let abcSynth = null;
-    let audioContext = null;
-    let visualObj = null;
 
     // ------------------
     // Ielādē visus jautājumus no /polls
@@ -199,8 +203,6 @@
                     count: item.count
                 });
             });
-
-            console.log("Grouped questions:", groupedByQuestion);
 
             // Parāda visus jautājumus
             displayAllQuestions();
@@ -272,6 +274,170 @@
     }
 
     // ------------------
+    // Atskaņo ABC notāciju caur ABCJS
+    // ------------------
+    async function playABC(abcString, indicatorText = "▶ Playing...") {
+        if (!abcString) return;
+        
+        await stopPlayback();
+        
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            await audioContext.resume();
+        }
+
+        // Parāda indikatoru
+        const notesElement = document.getElementById("notesSequence");
+        const indicator = document.createElement("span");
+        indicator.className = "playing-indicator";
+        indicator.textContent = indicatorText;
+        notesElement.appendChild(indicator);
+        
+        isPlaying = true;
+        
+        try {
+            // Renderē ABC vizuāli (bet nerāda to pašā atskaņošanas laikā)
+            const visualObj = ABCJS.renderAbc("*", abcString, {
+                responsive: true,
+                staffwidth: 600
+            })[0];
+            
+            // Izveido sintēzes objektu
+            const synth = new ABCJS.synth.CreateSynth();
+            currentSynth = synth;
+            
+            await synth.init({ 
+                visualObj: visualObj, 
+                audioContext,
+                options: {
+                    soundFontUrl: "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/"
+                }
+            });
+            
+            await synth.prime();
+            
+            // Atskaņo
+            synth.start();
+            
+            // Atgriež promise, kas beidzas kad atskaņošana beigusies
+            return new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if (!isPlaying) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+            
+        } catch (e) {
+            console.error("Error playing ABC:", e);
+            isPlaying = false;
+            if (indicator && indicator.parentNode) {
+                indicator.remove();
+            }
+            throw e;
+        }
+    }
+
+    // ------------------
+    // Atskaņo vienu frāzi
+    // ------------------
+    async function playSinglePhrase(phrase) {
+        if (!phrase) return;
+        
+        const header = `X:1
+T:Note Phrase
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+`;
+        
+        // Formatē frāzi ar taktsvītrām
+        const formattedPhrase = phrase.replace(/\|/g, ' | ');
+        const fullAbc = header + formattedPhrase;
+        
+        await playABC(fullAbc, "▶ Playing phrase...");
+        
+        // Noņem indikatoru
+        const indicator = document.querySelector('.playing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+        
+        isPlaying = false;
+    }
+
+    // ------------------
+    // Atskaņo pilnu melodiju
+    // ------------------
+    async function playFullMelody() {
+        if (!melodyNotes.length) return;
+        
+        const header = `X:1
+T:Full Melody
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+`;
+        
+        // Izveido pilnu ABC notāciju
+        let fullAbc = header;
+        
+        melodyNotes.forEach((phrase, index) => {
+            // Pievieno frāzi
+            fullAbc += phrase;
+            
+            // Pievieno taktsvītru starp frāzēm, izņemot pēdējo
+            if (index < melodyNotes.length - 1) {
+                if (!phrase.endsWith('|')) {
+                    fullAbc += ' |';
+                }
+            }
+            
+            fullAbc += ' ';
+        });
+        
+        console.log("Playing full melody:", fullAbc);
+        
+        await playABC(fullAbc, "▶ Playing full melody...");
+        
+        // Noņem indikatoru
+        const indicator = document.querySelector('.playing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+        
+        isPlaying = false;
+    }
+
+    // ------------------
+    // Aptur atskaņošanu
+    // ------------------
+    async function stopPlayback() {
+        if (currentSynth) {
+            try {
+                currentSynth.stop();
+            } catch (e) {
+                console.log("Error stopping synth:", e);
+            }
+            currentSynth = null;
+        }
+        
+        isPlaying = false;
+        
+        // Noņem indikatoru
+        const indicator = document.querySelector('.playing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+        
+        // Neliela pauze, lai synth apturētos
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    // ------------------
     // Balsošana
     // ------------------
     async function vote(question_id, option) {
@@ -315,7 +481,7 @@
             updateMelody();
             
             // Atskaņo tikko pievienoto nošu frāzi
-            await playNotePhrase(option);
+            await playSinglePhrase(option);
             
             votedQuestions.add(question_id);
             await loadPolls();
@@ -323,234 +489,6 @@
         } catch (e) {
             console.error("Error voting:", e);
             alert("Failed to submit vote: " + e.message);
-        }
-    }
-
-    // ------------------
-    // Aprēķina precīzu nošu ilgumu
-    // ------------------
-    function calculateNoteDuration(abcPhrase) {
-        // Noņem | simbolus un sadala pa notīm
-        const notes = abcPhrase.replace(/\|/g, ' ').split(/\s+/).filter(n => n.length > 0);
-        
-        let totalBeats = 0;
-        
-        notes.forEach(note => {
-            // ABC notācijā: C4 nozīmē ceturtdaļnots, C2 - pusnots, C8 - astotdaļnots utt.
-            // Pēdējais cipars norāda ilgumu: 1=vesela, 2=puse, 4=ceturtdaļa, 8=astotdaļa, 16=sešpadsmitdaļa
-            const match = note.match(/\d+$/);
-            if (match) {
-                const duration = parseInt(match[0]);
-                // Pārvērš uz ceturtdaļnotīm: 4 = 1 ceturtdaļnots, 2 = 2 ceturtdaļnotis, 8 = 0.5 ceturtdaļnotis
-                totalBeats += 4 / duration;
-            } else {
-                // Ja nav norādīts ilgums, pieņem ceturtdaļnoti
-                totalBeats += 1;
-            }
-        });
-        
-        // Pie 120 BPM, viena ceturtdaļnots ilgst 0.5 sekundes
-        // Pievienojam 0.5 sekundes klusuma beigās, lai pēdējā nots izskanētu līdz galam
-        return (totalBeats * 0.5) + 0.5;
-    }
-
-    // ------------------
-    // Atskaņo nošu frāzi
-    // ------------------
-    async function playNotePhrase(phrase) {
-        if (!phrase) return;
-        
-        // Pārbauda vai frāze satur tikai | simbolus
-        if (phrase.replace(/\|/g, '').trim() === '') {
-            console.log("Only bar lines, nothing to play");
-            return;
-        }
-        
-        // Ja jau skan, aptur
-        if (isPlaying && abcSynth) {
-            try {
-                abcSynth.stop();
-            } catch (e) {
-                console.log("Error stopping previous playback:", e);
-            }
-            await new Promise(resolve => setTimeout(resolve, 150));
-        }
-        
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            await audioContext.resume();
-        }
-        
-        if (!abcSynth) {
-            abcSynth = new ABCJS.synth.CreateSynth();
-        }
-
-        const header = `X:1
-T:Note Phrase
-M:4/4
-L:1/4
-Q:1/4=120
-K:C
-`;
-        
-        // Formatē frāzi ABCJS vajadzībām
-        const formattedPhrase = phrase.replace(/\|/g, ' | ');
-        const fullAbc = header + formattedPhrase;
-
-        try {
-            // Parāda, ka notiek atskaņošana
-            const notesElement = document.getElementById("notesSequence");
-            const indicator = document.createElement("span");
-            indicator.className = "playing-indicator";
-            indicator.textContent = "▶ Playing...";
-            notesElement.appendChild(indicator);
-            
-            // Renderē ABC
-            const tempVisualObj = ABCJS.renderAbc("abc-notation", fullAbc, { 
-                responsive: true,
-                staffwidth: 400
-            })[0];
-            
-            isPlaying = true;
-            
-            await abcSynth.init({ 
-                visualObj: tempVisualObj, 
-                audioContext,
-                options: {
-                    soundFontUrl: "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/"
-                }
-            });
-            
-            await abcSynth.prime();
-            abcSynth.start();
-            
-            // Aprēķina precīzu ilgumu
-            const duration = calculateNoteDuration(phrase);
-            console.log(`Playing phrase for ${duration} seconds`);
-            
-            // Pēc ilguma aptur atskaņošanu
-            setTimeout(() => {
-                if (abcSynth && isPlaying) {
-                    try {
-                        abcSynth.stop();
-                    } catch (e) {
-                        console.log("Error stopping playback:", e);
-                    }
-                    isPlaying = false;
-                    
-                    // Noņem indikatoru
-                    if (indicator && indicator.parentNode) {
-                        indicator.remove();
-                    }
-                }
-            }, duration * 1000);
-            
-        } catch (e) {
-            console.error("Error playing phrase:", e);
-            isPlaying = false;
-            
-            // Noņem indikatoru
-            const indicator = document.querySelector('.playing-indicator');
-            if (indicator) {
-                indicator.remove();
-            }
-        }
-    }
-
-    // ------------------
-    // Atskaņo pilnu melodiju
-    // ------------------
-    async function playFullMelody() {
-        if (!melodyNotes.length) return;
-        
-        // Ja jau skan, aptur
-        if (isPlaying && abcSynth) {
-            try {
-                abcSynth.stop();
-            } catch (e) {
-                console.log("Error stopping previous playback:", e);
-            }
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 150));
-        
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            await audioContext.resume();
-        }
-        
-        if (!abcSynth) {
-            abcSynth = new ABCJS.synth.CreateSynth();
-        }
-
-        const header = `X:1
-T:Full Melody
-M:4/4
-L:1/4
-Q:1/4=120
-K:C
-`;
-        
-        // Savieno visas notis ar atstarpēm
-        const body = melodyNotes.join(" ").replace(/\|/g, ' | ');
-        const fullAbc = header + body;
-
-        try {
-            // Parāda, ka notiek atskaņošana
-            const notesElement = document.getElementById("notesSequence");
-            const indicator = document.createElement("span");
-            indicator.className = "playing-indicator";
-            indicator.textContent = "▶ Playing full melody...";
-            notesElement.appendChild(indicator);
-            
-            const tempVisualObj = ABCJS.renderAbc("abc-notation", fullAbc, { responsive: true })[0];
-            
-            isPlaying = true;
-            
-            await abcSynth.init({ 
-                visualObj: tempVisualObj, 
-                audioContext,
-                options: {
-                    soundFontUrl: "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/"
-                }
-            });
-            
-            await abcSynth.prime();
-            abcSynth.start();
-            
-            // Aprēķina kopējo ilgumu visām frāzēm
-            let totalDuration = 0;
-            melodyNotes.forEach(phrase => {
-                totalDuration += calculateNoteDuration(phrase);
-            });
-            
-            console.log(`Playing full melody for ${totalDuration} seconds`);
-            
-            setTimeout(() => {
-                if (abcSynth && isPlaying) {
-                    try {
-                        abcSynth.stop();
-                    } catch (e) {
-                        console.log("Error stopping playback:", e);
-                    }
-                    isPlaying = false;
-                    
-                    // Noņem indikatoru
-                    if (indicator && indicator.parentNode) {
-                        indicator.remove();
-                    }
-                }
-            }, totalDuration * 1000);
-            
-        } catch (e) {
-            console.error("Error playing melody:", e);
-            isPlaying = false;
-            
-            // Noņem indikatoru
-            const indicator = document.querySelector('.playing-indicator');
-            if (indicator) {
-                indicator.remove();
-            }
         }
     }
 
@@ -572,9 +510,8 @@ K:C
                 throw new Error("Reset failed");
             }
 
-            const data = await response.json();
-            console.log("Reset response:", data);
-
+            await stopPlayback();
+            
             melodyNotes = [];
             votedQuestions.clear();
             
@@ -588,6 +525,11 @@ K:C
             alert("Reset failed: " + e.message);
         }
     };
+
+    // ------------------
+    // Stop poga
+    // ------------------
+    document.getElementById("stopBtn").onclick = stopPlayback;
 
     // ------------------
     // Atjauno ABCJS melodiju
@@ -610,20 +552,30 @@ Q:1/4=120
 K:C
 `;
         
-        // Savienojam notis ar atstarpēm, bet | simbolus apstrādājam īpaši
-        const body = melodyNotes.join(" ").replace(/\|/g, ' | ');
+        // Izveido pilnu ABC notāciju
+        let fullAbc = header;
         
-        // Parādām lietotājam notis ar taktsvītrām
+        melodyNotes.forEach((phrase, index) => {
+            fullAbc += phrase;
+            if (index < melodyNotes.length - 1) {
+                if (!phrase.endsWith('|')) {
+                    fullAbc += ' |';
+                }
+            }
+            fullAbc += ' ';
+        });
+        
+        // Vienkāršs teksta attēlojums
         notesElement.innerHTML = melodyNotes.join(' <span style="color: #4CAF50; font-weight: bold;">|</span> ');
         
+        // Renderē ABC notāciju
         abcElement.innerHTML = "";
         
         try {
-            console.log("Rendering ABC:", header + body);
-            visualObj = ABCJS.renderAbc("abc-notation", header + body, {
+            ABCJS.renderAbc("abc-notation", fullAbc, {
                 responsive: true,
                 staffwidth: 800
-            })[0];
+            });
         } catch (e) {
             console.error("Error rendering ABC:", e);
             abcElement.innerHTML = `<p style="color: red;">Error rendering music: ${e.message}</p>`;
@@ -680,8 +632,9 @@ K:C
     // Inicializācija
     // ------------------
     
-    // Pievieno "Play Full Melody" pogas klikšķa handleri
+    // Pievieno pogu klikšķa handlerus
     document.getElementById("playFullBtn").onclick = playFullMelody;
+    document.getElementById("stopBtn").onclick = stopPlayback;
 
     // Sākumā ielādē aptaujas
     loadPolls();
@@ -695,6 +648,16 @@ K:C
             audioContext.resume();
         }
     }, { once: true });
+
+    // Pievieno audio konteksta aktivizāciju arī pirms atskaņošanas
+    document.addEventListener('click', async () => {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+    });
 
 </script>
 
