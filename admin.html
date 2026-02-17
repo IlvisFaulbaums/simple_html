@@ -3,19 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard - Musical Votes</title>
+<title>Admin Dashboard - Musical Votes with ABCJS</title>
+<!-- ABCJS library for music notation and playback -->
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
 <style>
-@font-face {
-  font-family: 'MusiQwik';
-  src: url('musiqwik.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
 body { 
   font-family: Arial; 
   padding: 20px; 
-  max-width: 1000px; 
+  max-width: 1200px; 
   margin: auto; 
   background: #f5f5f5;
 }
@@ -33,6 +28,7 @@ button {
   color: white;
   border: none;
   transition: all 0.2s;
+  font-weight: bold;
 }
 
 button:hover {
@@ -83,30 +79,20 @@ button.reset {
   margin: 20px 0;
 }
 
-.music-staff {
-  font-family: 'MusiQwik', Arial, sans-serif;
-  font-size: 48px;
-  line-height: 1.8;
+#abc-notation {
   background: #fff9e6;
   padding: 20px;
   border-radius: 8px;
-  overflow-x: auto;
-  white-space: nowrap;
   margin: 15px 0;
   border: 2px solid #4CAF50;
+  min-height: 200px;
 }
 
-.note-indicator {
-  display: inline-block;
-  width: 30px;
-  height: 30px;
-  line-height: 30px;
-  text-align: center;
-  border-radius: 50%;
-  background: #4CAF50;
-  color: white;
-  margin: 0 2px;
-  font-size: 14px;
+#abc-midi {
+  margin-top: 15px;
+  padding: 10px;
+  background: #f0f0f0;
+  border-radius: 6px;
 }
 
 .playback-controls {
@@ -114,13 +100,13 @@ button.reset {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
 .playback-btn {
   background: #2196F3;
   padding: 12px 25px;
   font-size: 16px;
-  font-weight: bold;
 }
 
 .speed-control {
@@ -159,20 +145,44 @@ button.reset {
   color: #4CAF50;
 }
 
-.playing {
-  animation: pulse 0.5s;
+.notation-selector {
+  display: flex;
+  gap: 10px;
+  margin: 15px 0;
+  flex-wrap: wrap;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); background: #ffd700; }
-  100% { transform: scale(1); }
+.notation-btn {
+  background: #9C27B0;
+}
+
+.notation-btn.active {
+  background: #4CAF50;
+  transform: scale(1.05);
+}
+
+#abc-timing {
+  font-family: monospace;
+  padding: 10px;
+  background: #333;
+  color: #0f0;
+  border-radius: 4px;
+  margin-top: 10px;
+}
+
+/* ABCJS custom styles */
+.abcjs-note {
+  cursor: pointer;
+}
+
+.abcjs-highlight {
+  fill: #ff0000 !important;
 }
 </style>
 </head>
 <body>
 
-<h1>🎼 Admin Dashboard - Musical Vote Conductor 🎼</h1>
+<h1>🎼 Admin Dashboard - Musical Vote Composer 🎼</h1>
 
 <div id="login">
   <input type="password" id="password" placeholder="Enter admin password">
@@ -185,34 +195,49 @@ button.reset {
     <button class="reset" onclick="resetVotes()">Reset All Votes</button>
   </div>
 
-  <!-- Musical Playback Section -->
+  <!-- Musical Playback Section with ABCJS -->
   <div class="music-controls">
-    <h3>🎵 Play the Vote Melody</h3>
+    <h3>🎵 Musical Score from Votes</h3>
+    
+    <div class="notation-selector">
+      <button class="notation-btn" onclick="updateNotation('melody')">🎵 Melody Line</button>
+      <button class="notation-btn" onclick="updateNotation('chords')">🎹 With Chords</button>
+      <button class="notation-btn" onclick="updateNotation('rhythm')">🥁 Rhythm Pattern</button>
+      <button class="notation-btn" onclick="updateNotation('arpeggio')">🎸 Arpeggiated</button>
+    </div>
     
     <div class="playback-controls">
-      <button class="playback-btn" onclick="playFullPiece()">▶️ Play Full Piece</button>
-      <button class="playback-btn" onclick="stopPlayback()">⏹️ Stop</button>
+      <button class="playback-btn" onclick="playMusic()">▶️ Play</button>
+      <button class="playback-btn" onclick="pauseMusic()">⏸️ Pause</button>
+      <button class="playback-btn" onclick="stopMusic()">⏹️ Stop</button>
       
       <div class="speed-control">
-        <label>Speed:</label>
-        <input type="range" id="tempo" min="0.5" max="2" step="0.1" value="1">
-        <span id="tempoValue">1.0x</span>
+        <label>Tempo (BPM):</label>
+        <input type="range" id="tempo" min="40" max="200" step="5" value="120" onchange="updateTempo()">
+        <span id="tempoValue">120</span>
       </div>
       
-      <div class="speed-control">
-        <label>Volume:</label>
-        <input type="range" id="volume" min="0" max="1" step="0.1" value="0.5">
-      </div>
+      <select id="key-signature" onchange="updateKey()">
+        <option value="C">Key of C</option>
+        <option value="G">Key of G</option>
+        <option value="D">Key of D</option>
+        <option value="A">Key of A</option>
+        <option value="F">Key of F</option>
+        <option value="Bb">Key of Bb</option>
+      </select>
     </div>
 
-    <div class="music-staff" id="musicStaff">
-      ♩ ♪ ♫ ♬
-    </div>
+    <!-- ABC Notation Display -->
+    <div id="abc-notation"></div>
+    
+    <!-- MIDI Player -->
+    <div id="abc-midi"></div>
+    
+    <!-- Current Timing Info -->
+    <div id="abc-timing"></div>
 
     <!-- Note Statistics -->
-    <div class="note-stats" id="noteStats">
-      <!-- Will be populated dynamically -->
-    </div>
+    <div class="note-stats" id="noteStats"></div>
   </div>
 
   <!-- Tabular Results -->
@@ -222,12 +247,23 @@ button.reset {
 <script>
 const API = "https://api.sarunas.lat"; // Worker URL
 let password = "";
-let audioContext = null;
-let isPlaying = false;
-let currentTimeout = null;
-let currentNotes = [];
+let abcVisualObj = null;
+let currentTune = null;
+let currentNotation = 'melody';
+let currentKey = 'C';
 
-// Musical notes frequency mapping
+// Musical notes mapping to ABC notation
+const noteToABC = {
+  'DO': 'C',
+  'RE': 'D',
+  'MI': 'E',
+  'FA': 'F',
+  'SOL': 'G',
+  'LA': 'A',
+  'SI': 'B'
+};
+
+// Musical notes frequency mapping (for reference)
 const noteFrequencyMap = {
   'DO': 261.63,  // C4
   'RE': 293.66,  // D4
@@ -236,17 +272,6 @@ const noteFrequencyMap = {
   'SOL': 392.00, // G4
   'LA': 440.00,  // A4
   'SI': 493.88   // B4
-};
-
-// Musical note symbols for display
-const noteSymbolMap = {
-  'DO': '𝅝',  // Whole note
-  'RE': '𝅗𝅥',  // Half note
-  'MI': '𝅘𝅥',  // Quarter note
-  'FA': '𝅘𝅥𝅮',  // Eighth note
-  'SOL': '𝅘𝅥𝅯', // Sixteenth note
-  'LA': '𝅘𝅥𝅰',  // Thirty-second note
-  'SI': '𝅘𝅥𝅱'   // Sixty-fourth note
 };
 
 // Colors for different notes
@@ -277,110 +302,116 @@ async function login() {
   document.getElementById("login").style.display = "none";
   document.getElementById("dashboard").style.display = "block";
   
-  // Initialize audio context
-  initAudio();
-  
   loadResults();
 }
 
-// Initialize audio context
-async function initAudio() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+// Convert votes to ABC notation
+function votesToABC(data, style = 'melody') {
+  const tempo = document.getElementById('tempo').value;
+  let abcHeader = `X:1\nT:Vote Melody\nC:Generated from votes\nM:4/4\nL:1/8\nQ:1/4=${tempo}\nK:${currentKey}\n`;
+  
+  // Collect all notes from votes
+  const allNotes = [];
+  data.forEach(v => {
+    for (let i = 0; i < v.count; i++) {
+      allNotes.push(v.option);
+    }
+  });
+  
+  // Convert to ABC notes
+  const abcNotes = allNotes.map(note => noteToABC[note] || 'C').join(' ');
+  
+  let abcBody = '';
+  switch(style) {
+    case 'melody':
+      // Simple melody with quarter notes
+      abcBody = allNotes.map(note => {
+        const abcNote = noteToABC[note] || 'C';
+        return abcNote + '4';
+      }).join(' ');
+      break;
+      
+    case 'chords':
+      // Create chord progressions
+      abcBody = '';
+      for (let i = 0; i < allNotes.length; i += 2) {
+        const note1 = noteToABC[allNotes[i]] || 'C';
+        const note2 = allNotes[i+1] ? noteToABC[allNotes[i+1]] : note1;
+        abcBody += `"${note1}" [${note1}4 ${note2}4] `;
+      }
+      break;
+      
+    case 'rhythm':
+      // Add rhythmic variation
+      abcBody = allNotes.map((note, idx) => {
+        const abcNote = noteToABC[note] || 'C';
+        const rhythm = idx % 4 === 0 ? '4' : (idx % 4 === 2 ? '8' : '4');
+        return abcNote + rhythm;
+      }).join(' ');
+      break;
+      
+    case 'arpeggio':
+      // Arpeggiated patterns
+      abcBody = '';
+      allNotes.forEach(note => {
+        const abcNote = noteToABC[note] || 'C';
+        abcBody += `{${abcNote}4 ${abcNote}4 ${abcNote}4 ${abcNote}4} `;
+      });
+      break;
+      
+    default:
+      abcBody = allNotes.map(note => (noteToABC[note] || 'C') + '4').join(' ');
   }
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume();
+  
+  return abcHeader + abcBody + ' |]';
+}
+
+// Update notation based on selected style
+function updateNotation(style) {
+  currentNotation = style;
+  
+  // Highlight active button
+  document.querySelectorAll('.notation-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  event.target.classList.add('active');
+  
+  loadResults(); // Reload with new notation style
+}
+
+// Update key signature
+function updateKey() {
+  currentKey = document.getElementById('key-signature').value;
+  loadResults();
+}
+
+// Update tempo
+function updateTempo() {
+  const tempo = document.getElementById('tempo').value;
+  document.getElementById('tempoValue').textContent = tempo;
+  loadResults();
+}
+
+// Play music using ABCJS
+function playMusic() {
+  if (abcVisualObj) {
+    abcVisualObj.play();
   }
 }
 
-// Play a single note
-async function playNote(noteName, duration = 0.5) {
-  try {
-    await initAudio();
-    
-    const frequency = noteFrequencyMap[noteName] || 440.00;
-    const volume = parseFloat(document.getElementById('volume').value);
-    
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
-    
-    // Envelope for a nice note sound
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(volume, audioContext.currentTime + 0.05);
-    gainNode.gain.linearRampToValueAtTime(volume * 0.7, audioContext.currentTime + duration * 0.3);
-    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + duration);
-    
-    // Highlight the note in the staff
-    highlightNote(noteName);
-    
-  } catch (error) {
-    console.log("Audio play failed:", error);
+// Pause music
+function pauseMusic() {
+  if (abcVisualObj) {
+    abcVisualObj.pause();
   }
 }
 
-// Highlight the currently playing note
-function highlightNote(noteName) {
-  const staff = document.getElementById('musicStaff');
-  const notes = staff.innerHTML.split('');
-  
-  // Create a temporary span to find and highlight
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = staff.innerHTML;
-  
-  // Add a visual indicator (you can enhance this)
-  staff.classList.add('playing');
-  setTimeout(() => staff.classList.remove('playing'), 200);
-}
-
-// Play the full musical piece from votes
-async function playFullPiece() {
-  if (isPlaying) {
-    stopPlayback();
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  const tempo = parseFloat(document.getElementById('tempo').value);
-  const baseDuration = 0.5 / tempo; // Half second per note at tempo 1
-  
-  isPlaying = true;
-  
-  for (let i = 0; i < currentNotes.length; i++) {
-    if (!isPlaying) break;
-    
-    const note = currentNotes[i];
-    await playNote(note, baseDuration);
-    
-    // Wait for the note to finish before playing the next
-    await new Promise(resolve => {
-      currentTimeout = setTimeout(resolve, baseDuration * 1000);
-    });
-  }
-  
-  isPlaying = false;
-}
-
-// Stop playback
-function stopPlayback() {
-  isPlaying = false;
-  if (currentTimeout) {
-    clearTimeout(currentTimeout);
-    currentTimeout = null;
+// Stop music
+function stopMusic() {
+  if (abcVisualObj) {
+    abcVisualObj.stop();
   }
 }
-
-// Update tempo display
-document.getElementById('tempo').addEventListener('input', function(e) {
-  document.getElementById('tempoValue').textContent = e.target.value + 'x';
-});
 
 // Load votes dynamically
 async function loadResults() {
@@ -399,16 +430,11 @@ async function loadResults() {
     grouped[v.question_id].push(v);
   });
 
-  // Create musical sequence from all votes
-  currentNotes = [];
-  data.forEach(v => {
-    for (let i = 0; i < v.count; i++) {
-      currentNotes.push(v.option);
-    }
-  });
-
-  // Update musical staff display
-  updateMusicStaff(data);
+  // Generate ABC notation from votes
+  const abcNotation = votesToABC(data, currentNotation);
+  
+  // Render ABC notation
+  renderABC(abcNotation);
   
   // Update note statistics
   updateNoteStats(data);
@@ -417,51 +443,60 @@ async function loadResults() {
   let html = "";
   Object.keys(grouped).forEach(qid => {
     html += `<h3>Question: ${qid}</h3>`;
-    html += "<table><tr><th>Option</th><th>Votes</th><th>Musical Representation</th></tr>";
+    html += "<table><tr><th>Option</th><th>Votes</th><th>ABC Notation</th></tr>";
     grouped[qid].forEach(opt => {
-      const noteSymbol = noteSymbolMap[opt.option] || '♪';
-      const notes = noteSymbol.repeat(Math.min(opt.count, 10));
+      const abcNote = noteToABC[opt.option] || 'C';
       html += `<tr>
         <td style="background: ${noteColors[opt.option] || '#fff'}">${opt.option}</td>
         <td><strong>${opt.count}</strong></td>
-        <td style="font-family: MusiQwik; font-size: 24px;">${notes}</td>
+        <td style="font-family: monospace; font-size: 18px;">${abcNote} (${opt.count}x)</td>
       </tr>`;
     });
     html += "</table>";
   });
 
   document.getElementById("results").innerHTML = html;
+  
+  // Display ABC notation text
+  document.getElementById('abc-timing').innerHTML = 
+    `<strong>ABC Notation:</strong> ${abcNotation.substring(0, 100)}...`;
 }
 
-// Update the musical staff display
-function updateMusicStaff(data) {
-  const staff = document.getElementById('musicStaff');
-  let staffHtml = '';
+// Render ABC notation
+function renderABC(abcNotation) {
+  const visualOptions = {
+    paddingtop: 20,
+    paddingbottom: 20,
+    paddingleft: 20,
+    paddingright: 20,
+    staffwidth: 800,
+    responsive: 'resize'
+  };
   
-  // Create a sequence of notes
-  const allNotes = [];
-  data.forEach(v => {
-    for (let i = 0; i < Math.min(v.count, 5); i++) { // Limit to 5 per vote for display
-      allNotes.push(v.option);
-    }
-  });
+  const midiOptions = {
+    qpm: parseInt(document.getElementById('tempo').value),
+    generateDownload: false
+  };
   
-  // Display notes in staff
-  allNotes.slice(0, 30).forEach(note => {
-    const symbol = noteSymbolMap[note] || '♪';
-    staffHtml += `<span style="color: ${noteColors[note] || '#000'}; margin: 0 5px;" title="${note}">${symbol}</span>`;
-  });
+  // Clear previous content
+  document.getElementById('abc-notation').innerHTML = '';
+  document.getElementById('abc-midi').innerHTML = '';
   
-  if (allNotes.length > 30) {
-    staffHtml += '<span style="color: #999;"> ...</span>';
+  // Render the notation
+  abcVisualObj = ABCJS.renderAbc(
+    'abc-notation', 
+    abcNotation, 
+    visualOptions,
+    midiOptions
+  );
+  
+  // Add MIDI controls
+  if (abcVisualObj[0]) {
+    currentTune = abcVisualObj[0];
+    ABCJS.renderMidi('abc-midi', abcNotation, {
+      qpm: parseInt(document.getElementById('tempo').value)
+    });
   }
-  
-  // Add measure numbers
-  staffHtml = '<div style="font-size: 14px; color: #666; margin-bottom: 10px;">' + 
-              'Measure 1 &nbsp;&nbsp; Measure 2 &nbsp;&nbsp; Measure 3 &nbsp;&nbsp; Measure 4</div>' + 
-              staffHtml;
-  
-  staff.innerHTML = staffHtml;
 }
 
 // Update note statistics
@@ -476,28 +511,32 @@ function updateNoteStats(data) {
   
   let statsHtml = '';
   const notes = ['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI'];
+  const totalVotes = data.reduce((sum, v) => sum + v.count, 0);
   
   notes.forEach(note => {
     const count = noteCounts[note] || 0;
-    const percentage = data.length > 0 ? Math.round((count / data.reduce((sum, v) => sum + v.count, 0)) * 100) : 0;
+    const percentage = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+    const abcNote = noteToABC[note] || 'C';
     
     statsHtml += `
       <div class="stat-card" style="border-top: 4px solid ${noteColors[note] || '#999'}">
-        <h4>${note}</h4>
+        <h4>${note} (${abcNote})</h4>
         <div class="stat-number">${count}</div>
         <div style="font-size: 12px; color: #666;">${percentage}% of votes</div>
-        <div style="font-family: MusiQwik; font-size: 24px; margin-top: 5px;">${noteSymbolMap[note] || '♪'}</div>
+        <div style="font-family: monospace; font-size: 20px; margin-top: 5px;">${abcNote}</div>
       </div>
     `;
   });
   
-  // Add total votes
-  const totalVotes = data.reduce((sum, v) => sum + v.count, 0);
+  // Add musical key info
   statsHtml += `
     <div class="stat-card" style="border-top: 4px solid #333; grid-column: span 2;">
-      <h4>Total Votes</h4>
+      <h4>Musical Summary</h4>
       <div class="stat-number">${totalVotes}</div>
-      <div style="font-family: MusiQwik; font-size: 32px; margin-top: 5px;">♫ ♪ ♫</div>
+      <div style="font-size: 14px; margin-top: 5px;">Total Notes</div>
+      <div style="font-family: monospace; font-size: 16px; margin-top: 5px;">
+        Key: ${currentKey} | Tempo: ${document.getElementById('tempo').value} BPM
+      </div>
     </div>
   `;
   
@@ -507,7 +546,7 @@ function updateNoteStats(data) {
 // Reset votes and reload from CSV
 async function resetVotes() {
   if (!confirm("Reset all votes and questions?")) return;
-  stopPlayback();
+  stopMusic();
   
   const res = await fetch(API + "/admin/reset", {
     method: "POST",
@@ -530,10 +569,7 @@ setInterval(() => {
 
 // Clean up on page unload
 window.addEventListener('beforeunload', function() {
-  stopPlayback();
-  if (audioContext) {
-    audioContext.close();
-  }
+  stopMusic();
 });
 </script>
 </body>
