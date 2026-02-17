@@ -377,7 +377,7 @@ async function initAudio() {
   }
 }
 
-// Play a note with specific duration from ABC notation
+// Play a note with specific duration from ABC notation - CORRECTED PLAYBACK
 async function playABCNote(abcNote) {
   try {
     await initAudio();
@@ -389,10 +389,33 @@ async function playABCNote(abcNote) {
     }
     
     const frequency = getFrequency(parsed.pitch);
-    const beatDuration = 60 / tempo; // Duration of one quarter note in seconds
-    const noteDuration = beatDuration * durationToBeats[parsed.duration];
     
-    console.log(`Playing ${abcNote}: ${parsed.pitch} at ${frequency}Hz for ${noteDuration.toFixed(2)}s (${durationToBeats[parsed.duration]} beats)`);
+    // CORRECTED: Calculate duration based on note value
+    // At tempo 120, one quarter note = 0.5 seconds
+    const quarterNoteDuration = 60 / tempo; // seconds per quarter note
+    
+    // Map ABC note duration to multiplier
+    let durationMultiplier;
+    switch(parsed.duration) {
+      case '1': // Whole note
+        durationMultiplier = 4;
+        break;
+      case '2': // Half note
+        durationMultiplier = 2;
+        break;
+      case '4': // Quarter note
+        durationMultiplier = 1;
+        break;
+      case '8': // Eighth note
+        durationMultiplier = 0.5;
+        break;
+      default:
+        durationMultiplier = 1;
+    }
+    
+    const noteDuration = quarterNoteDuration * durationMultiplier;
+    
+    console.log(`Playing ${abcNote}: ${parsed.pitch} at ${frequency}Hz for ${noteDuration.toFixed(3)}s (${durationMultiplier} × quarter note)`);
     
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -403,26 +426,27 @@ async function playABCNote(abcNote) {
     // Envelope based on duration
     const now = audioContext.currentTime;
     gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(volume, now + 0.05);
+    gainNode.gain.linearRampToValueAtTime(volume, now + 0.01);
     
     // Different sustain for longer notes
-    if (parsed.duration === '1') {
-      // Whole note - long sustain
-      gainNode.gain.linearRampToValueAtTime(volume * 0.8, now + noteDuration * 0.8);
-      gainNode.gain.linearRampToValueAtTime(volume * 0.6, now + noteDuration * 0.9);
-    } else if (parsed.duration === '2') {
-      // Half note - medium sustain
-      gainNode.gain.linearRampToValueAtTime(volume * 0.8, now + noteDuration * 0.7);
-      gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.85);
-    } else if (parsed.duration === '4') {
+    if (durationMultiplier >= 2) {
+      // Half and whole notes - longer sustain
+      gainNode.gain.setValueAtTime(volume, now + 0.02);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.7, now + noteDuration * 0.7);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.4, now + noteDuration * 0.9);
+    } else if (durationMultiplier === 1) {
       // Quarter note - normal decay
-      gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.5);
+      gainNode.gain.setValueAtTime(volume, now + 0.02);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.6);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.2, now + noteDuration * 0.8);
     } else {
       // Eighth note - quick decay
-      gainNode.gain.linearRampToValueAtTime(volume * 0.3, now + noteDuration * 0.3);
+      gainNode.gain.setValueAtTime(volume, now + 0.01);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.3, now + noteDuration * 0.4);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.1, now + noteDuration * 0.6);
     }
     
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + noteDuration);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + noteDuration);
     
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
