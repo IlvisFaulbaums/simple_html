@@ -1,32 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Poll</title>
-<style>
-  body { font-family: Arial; text-align: center; padding: 40px; background: #f4f4f4; }
-  button { padding: 12px 25px; font-size: 16px; margin: 10px; cursor: pointer; border: none; border-radius: 6px; }
-  .yes { background: #4CAF50; color: white; }
-  .no { background: #f44336; color: white; }
-  #results { margin-top: 30px; font-size: 18px; }
-  .bar { height: 20px; border-radius: 5px; margin: 5px auto; width: 300px; background: #ddd; position: relative; }
-  .fill { height: 100%; border-radius: 5px; text-align: right; padding-right: 5px; color: white; line-height: 20px; }
-  .yes-fill { background: #4CAF50; }
-  .no-fill { background: #f44336; }
-</style>
-</head>
-<body>
-
-<h2>Do you like this poll?</h2>
-<button class="yes" onclick="vote('yes')">Yes</button>
-<button class="no" onclick="vote('no')">No</button>
-<div id="results">Loading...</div>
-
 <script>
-const API = "https://api.sarunas.lat"; // <-- your Worker API domain
+const API = "https://api.sarunas.lat";
 
-// Generate/get unique voter ID
+// Generate or get a unique voter ID per browser
 function getVoterId() {
   let id = localStorage.getItem("voter_id");
   if (!id) {
@@ -36,31 +11,6 @@ function getVoterId() {
   return id;
 }
 
-// Load results
-async function load() {
-  try {
-    const res = await fetch(API + "/results");
-    const data = await res.json();
-
-    let yes = data.find(r => r.option === "yes")?.count || 0;
-    let no = data.find(r => r.option === "no")?.count || 0;
-    let total = yes + no;
-    let yesPercent = total ? ((yes / total) * 100).toFixed(1) : 0;
-    let noPercent = total ? ((no / total) * 100).toFixed(1) : 0;
-
-    document.getElementById("results").innerHTML = `
-      <p>Total votes: ${total}</p>
-      <div>Yes: ${yes} (${yesPercent}%)</div>
-      <div class="bar"><div class="fill yes-fill" style="width:${yesPercent}%">${yesPercent}%</div></div>
-      <div>No: ${no} (${noPercent}%)</div>
-      <div class="bar"><div class="fill no-fill" style="width:${noPercent}%">${noPercent}%</div></div>
-    `;
-  } catch (err) {
-    document.getElementById("results").innerText = "Error loading results";
-  }
-}
-
-// Submit vote
 async function vote(option) {
   try {
     const res = await fetch(API + "/vote", {
@@ -70,9 +20,7 @@ async function vote(option) {
     });
     const data = await res.json();
 
-    if (data.error) {
-      alert(data.error); // prevents multiple voting
-    }
+    if (data.error) alert(data.error); // prevents multiple voting
 
     load();
   } catch (err) {
@@ -80,10 +28,20 @@ async function vote(option) {
   }
 }
 
-// Initial load + auto refresh
+async function load() {
+  const res = await fetch(API + "/results");
+  const data = await res.json();
+  let yes = data.find(r => r.option === "yes")?.count || 0;
+  let no = data.find(r => r.option === "no")?.count || 0;
+  let total = yes + no;
+
+  document.getElementById("results").innerHTML = `
+    <p>Total votes: ${total}</p>
+    <p>Yes: ${yes}</p>
+    <p>No: ${no}</p>
+  `;
+}
+
 load();
 setInterval(load, 2000);
 </script>
-
-</body>
-</html>
