@@ -37,6 +37,7 @@ button:active { transform: scale(0.95); }
   color: white;
   border: none;
   border-radius: 4px;
+  font-weight: bold;
 }
 .vote-btn:hover {
   background: #45a049;
@@ -47,11 +48,15 @@ button:active { transform: scale(0.95); }
   border: none;
   border-radius: 4px;
 }
+.musical-note {
+  font-size: 24px;
+  margin-right: 5px;
+}
 </style>
 </head>
 <body>
 
-<h2>🎵 Vote on the Poll with Music 🎵</h2>
+<h2>🎵 Vote on the Musical Poll 🎵</h2>
 <div id="poll-container"></div>
 
 <h3>Results:</h3>
@@ -76,33 +81,39 @@ if (!voterId) {
   localStorage.setItem("voterId", voterId);
 }
 
-// Musical notes mapping for different options
-const noteMap = {
-  'A': 261.63, // C4
-  'B': 293.66, // D4
-  'C': 329.63, // E4
-  'D': 349.23, // F4
-  'E': 392.00, // G4
-  'F': 440.00, // A4
-  'G': 493.88, // B4
-  'default': 440.00 // A4
+// Musical notes frequency mapping (solfège to frequency)
+const noteFrequencyMap = {
+  'DO': 261.63,  // C4
+  'RE': 293.66,  // D4
+  'MI': 329.63,  // E4
+  'FA': 349.23,  // F4
+  'SOL': 392.00, // G4
+  'LA': 440.00,  // A4
+  'SI': 493.88   // B4
 };
 
-// Function to play a note
-async function playNote(optionText) {
+// Musical note symbols for display
+const noteSymbolMap = {
+  'DO': '𝅝',  // Whole note
+  'RE': '𝅗𝅥',  // Half note
+  'MI': '𝅘𝅥',  // Quarter note
+  'FA': '𝅘𝅥𝅮',  // Eighth note
+  'SOL': '𝅘𝅥𝅯', // Sixteenth note
+  'LA': '𝅘𝅥𝅰',  // Thirty-second note
+  'SI': '𝅘𝅥𝅱'   // Sixty-fourth note
+};
+
+// Function to play a musical note
+async function playNote(noteName) {
   try {
-    // Initialize audio context on first user interaction
+    // Initialize audio context on first use
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       await audioContext.resume();
     }
 
-    // Determine which note to play based on the option text
-    let frequency = noteMap.default;
-    const firstChar = optionText.charAt(0).toUpperCase();
-    if (noteMap[firstChar]) {
-      frequency = noteMap[firstChar];
-    }
+    // Get frequency for the note (default to 440Hz if not found)
+    const frequency = noteFrequencyMap[noteName] || 440.00;
 
     // Create and play the note
     const oscillator = audioContext.createOscillator();
@@ -111,14 +122,19 @@ async function playNote(optionText) {
     oscillator.type = 'sine';
     oscillator.frequency.value = frequency;
     
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+    // Envelope for a nice note sound
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.3);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1);
     
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
     
     oscillator.start();
     oscillator.stop(audioContext.currentTime + 1);
+    
+    console.log(`Playing note: ${noteName} (${frequency}Hz)`);
     
   } catch (error) {
     console.log("Audio play failed:", error);
@@ -142,11 +158,14 @@ async function loadQuestions() {
 
   for (const qid in questions) {
     const div = document.createElement("div");
-    div.innerHTML = `<h3>${qid}</h3>`; // or you can replace qid with actual question text if CSV has text
+    div.innerHTML = `<h3>Question ${qid}</h3>`;
     questions[qid].forEach(opt => {
       const btn = document.createElement("button");
       btn.className = "vote-btn";
       btn.innerText = opt;
+      // Add a musical note emoji based on the option
+      const noteEmoji = getNoteEmoji(opt);
+      btn.innerHTML = `${noteEmoji} ${opt}`;
       btn.onclick = () => vote(qid, opt);
       div.appendChild(btn);
     });
@@ -156,9 +175,23 @@ async function loadQuestions() {
   loadResults();
 }
 
+// Helper function to get emoji for note
+function getNoteEmoji(note) {
+  const emojiMap = {
+    'DO': '🎵',
+    'RE': '🎶',
+    'MI': '🎵',
+    'FA': '🎶',
+    'SOL': '🎵',
+    'LA': '🎶',
+    'SI': '🎵'
+  };
+  return emojiMap[note] || '🎵';
+}
+
 // Vote function with note playing
 async function vote(questionId, option) {
-  // Play a note when voting
+  // Play the musical note from the option (DO, RE, MI, etc.)
   await playNote(option);
   
   const res = await fetch(API + "/vote", {
@@ -186,7 +219,7 @@ async function loadResults() {
 
   let text = "";
   for (const qid in grouped) {
-    text += qid + ": ";
+    text += `Question ${qid}: `;
     grouped[qid].forEach(o => { text += `${o.option}=${o.count} | `; });
     text += "\n";
   }
@@ -205,34 +238,59 @@ async function showAdminResults() {
     grouped[v.question_id].push(v);
   });
 
-  let adminText = "";
+  let adminText = "<div style='font-family: MusiQwik, Arial;'>";
+  
   for (const qid in grouped) {
-    adminText += `<div style="margin-bottom: 15px;">`;
-    adminText += `<strong style="font-family: Arial;">🎵 ${qid}:</strong><br>`;
+    adminText += `<div style="margin-bottom: 20px;">`;
+    adminText += `<div style="font-family: Arial; font-weight: bold; font-size: 20px;">🎼 Question ${qid}:</div>`;
     
     // Sort options by count for better visualization
     grouped[qid].sort((a, b) => b.count - a.count);
     
     grouped[qid].forEach(o => { 
-      // Create a musical representation based on count
-      const notes = "♪".repeat(Math.min(o.count, 10)); // Max 10 notes
-      adminText += `<span style="margin-left: 20px;">${o.option}: ${o.count} ${notes}</span><br>`;
+      // Create a musical staff representation
+      const noteSymbol = noteSymbolMap[o.option] || '♪';
+      const notes = noteSymbol.repeat(Math.min(o.count, 8)); // Max 8 notes per line
+      
+      adminText += `<div style="margin: 10px 0; font-size: 24px;">`;
+      adminText += `<span style="font-family: Arial; font-size: 16px;">${o.option}:</span> `;
+      adminText += `<span style="font-size: 28px;">${notes}</span>`;
+      adminText += `<span style="font-family: Arial; font-size: 14px; margin-left: 10px;">(${o.count} votes)</span>`;
+      adminText += `</div>`;
     });
+    
     adminText += `</div>`;
   }
   
-  // Add a musical staff representation
-  adminText += `<div style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">`;
-  adminText += `<strong>🎼 Total Votes Melody:</strong><br>`;
+  // Add a musical staff summary
+  adminText += `<div style="margin-top: 30px; border-top: 2px solid #333; padding-top: 20px;">`;
+  adminText += `<div style="font-family: Arial; font-weight: bold;">🎵 Musical Score Summary:</div>`;
+  adminText += `<div style="font-family: MusiQwik; font-size: 32px; line-height: 1.8;">`;
   
-  // Calculate total votes
-  const totalVotes = data.reduce((sum, item) => sum + item.count, 0);
-  adminText += `<span style="font-size: 24px;">`;
-  for (let i = 0; i < Math.min(totalVotes, 20); i++) {
-    adminText += "♪";
+  // Create a melody from all votes
+  const allNotes = [];
+  data.forEach(v => {
+    for (let i = 0; i < v.count; i++) {
+      allNotes.push(v.option);
+    }
+  });
+  
+  // Display first 16 notes as a melody
+  const melodyNotes = allNotes.slice(0, 16);
+  melodyNotes.forEach(note => {
+    adminText += noteSymbolMap[note] || '♪';
+    adminText += ' ';
+  });
+  
+  if (allNotes.length > 16) {
+    adminText += ' …';
   }
-  adminText += ` (${totalVotes} total votes)</span>`;
+  
   adminText += `</div>`;
+  adminText += `<div style="font-family: Arial; font-size: 14px; margin-top: 10px;">Total votes: ${allNotes.length}</div>`;
+  adminText += `</div>`;
+  
+  adminText += "</div>";
   
   document.getElementById("admin-results").innerHTML = adminText;
 }
