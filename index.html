@@ -18,97 +18,96 @@ button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 6px; b
 <body>
 
 <h2>Step-by-Step Poll</h2>
-<div id="question-container"></div>
+<div id="question-container">Loading...</div>
 
 <script>
-const API = "https://api.sarunas.lat"; // Replace with your Worker URL
-
-const questions = [
-  { id: "q1", text: "Do you like this site?" },
-  { id: "q2", text: "Do you enjoy polls?" },
-  { id: "q3", text: "Do you want more questions?" }
-];
-
+const API = "https://api.sarunas.lat"; // replace with your Worker URL
+let questions = [];
 let currentIndex = 0;
 
+// Generate a persistent voter ID
 function getVoterId() {
   let id = localStorage.getItem("voter_id");
   if (!id) { id = crypto.randomUUID(); localStorage.setItem("voter_id", id); }
   return id;
 }
 
-async function renderQuestion() {
+// Load questions dynamically from /results
+async function loadQuestions() {
+  const res = await fetch(API + "/results");
+  const data = await res.json();
+  
+  // Group options by question_id
+  const map = {};
+  data.forEach(v => {
+    if (!map[v.question_id]) map[v.question_id] = [];
+    map[v.question_id].push({ option: v.option, count: v.count });
+  });
+
+  questions = Object.keys(map).map(id => ({ id, options: map[id] }));
+  renderQuestion();
+}
+
+// Render the current question
+function renderQuestion() {
   const container = document.getElementById("question-container");
   if (currentIndex >= questions.length) {
     container.innerHTML = "<h3>Thank you for voting!</h3>";
-    await showResults();
+    showResults();
     return;
   }
 
   const q = questions[currentIndex];
+  let html = `<h3>${q.id}</h3>`; // You can replace with actual question text if needed
+  q.options.forEach(o => {
+    html += `<button onclick="vote('${q.id}','${o.option}')">${o.option}</button>`;
+  });
 
-  container.innerHTML = `
-    <h3>${q.text}</h3>
-    <button class="yes" onclick="vote('${q.id}','yes')">Yes</button>
-    <button class="no" onclick="vote('${q.id}','no')">No</button>
-    <div id="results-bar"></div>
-  `;
+  container.innerHTML = html;
 }
 
+// Vote function
 async function vote(question_id, option) {
-  try {
-    const body = {
-      voter_id: getVoterId(),
-      question_id,
-      option
-    };
+  const voter_id = getVoterId();
+  const res = await fetch(API + "/vote", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ voter_id, question_id, option })
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
 
-    const res = await fetch(API + "/vote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
-
-    // Move to next question
-    currentIndex++;
-    renderQuestion();
-
-  } catch (err) {
-    alert("Error submitting vote");
-  }
+  currentIndex++;
+  renderQuestion();
 }
 
+// Show results at the end
 async function showResults() {
   const container = document.getElementById("question-container");
-  try {
-    const res = await fetch(API + "/results");
-    const data = await res.json();
+  const res = await fetch(API + "/results");
+  const data = await res.json();
 
-    let html = "<h3>Current Results:</h3>";
-    questions.forEach(q => {
-      const votes = data.filter(v => v.question_id === q.id);
-      const yes = votes.find(v => v.option === "yes")?.count || 0;
-      const no = votes.find(v => v.option === "no")?.count || 0;
-      const total = yes + no;
-      const yesPercent = total ? ((yes/total)*100).toFixed(1) : 0;
-      const noPercent = total ? ((no/total)*100).toFixed(1) : 0;
+  let html = "<h3>Results:</h3>";
+  const grouped = {};
+  data.forEach(v => {
+    if (!grouped[v.question_id]) grouped[v.question_id] = [];
+    grouped[v.question_id].push(v);
+  });
 
-      html += `<p>${q.text}</p>
-        <div class="bar"><div class="fill yes-fill" style="width:${yesPercent}%">${yesPercent}%</div></div>
-        <div class="bar"><div class="fill no-fill" style="width:${noPercent}%">${noPercent}%</div></div>
-        <p>Total votes: ${total}</p>`;
+  Object.keys(grouped).forEach(qid => {
+    html += `<p>${qid}</p>`;
+    grouped[qid].forEach(opt => {
+      const total = grouped[qid].reduce((a,b) => a+b.count, 0);
+      const percent = total ? ((opt.count/total)*100).toFixed(1) : 0;
+      html += `<div class="bar"><div class="fill ${opt.option.includes("yes")?"yes-fill":"no-fill"}" style="width:${percent}%">${opt.option}: ${percent}%</div></div>`;
     });
+  });
 
-    container.innerHTML = html;
-  } catch(e) {
-    container.innerHTML += "<p>Error loading results</p>";
-  }
+  container.innerHTML = html;
 }
 
-window.addEventListener("DOMContentLoaded", renderQuestion);
+// Initialize
+window.addEventListener("DOMContentLoaded", loadQuestions);
 </script>
 
 </body>
