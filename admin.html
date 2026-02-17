@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Poll Dashboard</title>
+<style>
+body { font-family: Arial; text-align: center; background: #f4f4f4; padding: 30px; }
+input, button { padding: 10px; font-size: 16px; margin: 5px; }
+table { border-collapse: collapse; margin: 20px auto; width: 80%; }
+th, td { border: 1px solid #ccc; padding: 10px; }
+button.reset { background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h2>Admin Dashboard</h2>
+<div id="login">
+  <input type="password" id="password" placeholder="Enter admin password">
+  <button onclick="login()">Login</button>
+</div>
+
+<div id="dashboard" style="display:none;">
+  <button class="reset" onclick="resetVotes()">Reset All Votes</button>
+  <div id="results"></div>
+</div>
+
+<script>
+const API = "https://api.sarunas.lat"; // replace with your Worker URL
+let password = "";
+
+// Login
+async function login() {
+  password = document.getElementById("password").value.trim();
+  if (!password) { alert("Enter password"); return; }
+
+  const res = await fetch(API + "/admin/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({password})
+  });
+
+  const data = await res.json();
+  if (!data.success) { alert("Invalid password"); return; }
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("dashboard").style.display = "block";
+  loadResults();
+}
+
+// Load votes
+async function loadResults() {
+  const res = await fetch(API + "/admin/results", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({password})
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+
+  let html = "<table><tr><th>Question ID</th><th>Option</th><th>Count</th></tr>";
+  data.forEach(v => {
+    html += `<tr><td>${v.question_id}</td><td>${v.option}</td><td>${v.count}</td></tr>`;
+  });
+  html += "</table>";
+  document.getElementById("results").innerHTML = html;
+}
+
+// Reset votes
+async function resetVotes() {
+  if (!confirm("Reset all votes?")) return;
+  const res = await fetch(API + "/admin/reset", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({password})
+  });
+  const data = await res.json();
+  if (data.success) { alert(data.message); loadResults(); }
+  else alert(data.error);
+}
+
+// Auto-refresh every 5 seconds
+setInterval(() => { if (password) loadResults(); }, 5000);
+</script>
+
+</body>
+</html>
