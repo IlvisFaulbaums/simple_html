@@ -111,6 +111,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 20px;
         }
         .vote-count {
             background-color: #e0e0e0;
@@ -121,13 +122,32 @@
     </style>
 </head>
 <body>
+
+<h2>🎵 Live Musical Poll (D1) 🎵</h2>
+
+<div id="poll-container">
+    <div class="poll-header">
+        <h3>Loading polls...</h3>
+        <div class="vote-count" id="totalVotes">Total votes: 0</div>
+    </div>
+</div>
+
+<div>
+    <button id="resetBtn">⚠️ Reset All Votes</button>
+</div>
+
+<h3>🎼 Current Melody</h3>
+<div id="abc-notation"></div>
+<div id="notesSequence">No notes yet</div>
+<div id="results">Loading results...</div>
+
 <script>
     const API = "https://api.sarunas.lat"; // Tavs Worker URL
 
-    let polls = []; // Visi jautājumi no /polls
-    let groupedByQuestion = {}; // Sagrupēti pēc question_id
+    let polls = [];
+    let groupedByQuestion = {};
     let melodyNotes = [];
-    let votedQuestions = new Set(); // Lai atcerētos, par kuriem jautājumiem jau balsots
+    let votedQuestions = new Set();
     
     // Voter ID no localStorage
     let voterId = localStorage.getItem("voterId");
@@ -150,7 +170,7 @@
             if (!response.ok) throw new Error("Failed to fetch polls");
             
             polls = await response.json();
-            console.log("Polls from API:", polls); // Debug
+            console.log("Polls from API:", polls);
 
             // Sagrupē pēc question_id
             groupedByQuestion = {};
@@ -167,12 +187,12 @@
                 });
             });
 
-            console.log("Grouped questions:", groupedByQuestion); // Debug
+            console.log("Grouped questions:", groupedByQuestion);
 
             // Parāda visus jautājumus
             displayAllQuestions();
             
-            // Atjauno melodiju (ja ir saglabātas notis)
+            // Atjauno melodiju
             updateMelody();
             
             // Parāda rezultātus
@@ -209,10 +229,9 @@
         questions.forEach((question, index) => {
             const box = document.createElement("div");
             box.className = "question-box";
-            box.dataset.questionId = question.question_id; // Izmanto dataset, nevis id
+            box.dataset.questionId = question.question_id;
             box.dataset.questionIndex = index;
             
-            // Pārbauda vai lietotājs jau ir balsots par šo jautājumu
             const hasVoted = votedQuestions.has(question.question_id);
             
             box.innerHTML = `
@@ -223,12 +242,11 @@
 
             const optionsContainer = box.querySelector(`#options-${index}`);
             
-            // Pievieno visas opcijas
             question.options.forEach(opt => {
                 const btn = document.createElement("button");
                 btn.className = "vote-btn";
                 btn.textContent = opt.option;
-                btn.disabled = hasVoted; // Atspējo, ja jau balsots
+                btn.disabled = hasVoted;
                 
                 btn.onclick = () => vote(question.question_id, opt.option);
                 optionsContainer.appendChild(btn);
@@ -237,7 +255,6 @@
             container.appendChild(box);
         });
 
-        // Atjauno total votes
         updateTotalVotes();
     }
 
@@ -262,10 +279,8 @@
 
             if (!response.ok) {
                 if (response.status === 403 && data.error === "You have already voted!") {
-                    // Lietotājs jau ir balsots
                     votedQuestions.add(question_id);
                     
-                    // Atjauno pogu stāvokli - atrod pareizo kasti pēc dataset
                     const questionBoxes = document.querySelectorAll('.question-box');
                     questionBoxes.forEach(box => {
                         if (box.dataset.questionId === question_id) {
@@ -274,7 +289,6 @@
                             alreadyVotedDiv.textContent = "✓ You have already voted on this question";
                             box.insertBefore(alreadyVotedDiv, box.querySelector('.options-container'));
                             
-                            // Atspējo visas pogas
                             const buttons = box.querySelectorAll('.vote-btn');
                             buttons.forEach(btn => btn.disabled = true);
                         }
@@ -288,10 +302,7 @@
             updateMelody();
             await playLastNote(option);
             
-            // Pievieno question_id balsoto sarakstam
             votedQuestions.add(question_id);
-            
-            // Atjauno rezultātus
             await loadPolls();
             
         } catch (e) {
@@ -321,11 +332,9 @@
             const data = await response.json();
             console.log("Reset response:", data);
 
-            // Notīra lokālos datus
             melodyNotes = [];
             votedQuestions.clear();
             
-            // Pārlādē aptaujas
             await loadPolls();
             updateMelody();
             
@@ -396,7 +405,6 @@ K:C
             await abcSynth.prime();
             abcSynth.start();
             
-            // Aptur atskaņošanu pēc 2 sekundēm
             setTimeout(() => {
                 if (abcSynth) {
                     abcSynth.stop();
@@ -423,11 +431,15 @@ K:C
         const questions = Object.values(groupedByQuestion);
         
         questions.forEach(question => {
-            html += `<div style="margin-bottom: 15px;">`;
-            html += `<strong>Question ${question.question_id}</strong><br>`;
+            html += `<div style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 6px;">`;
+            html += `<strong style="color: #4CAF50;">Question ${question.question_id}</strong><br>`;
             
             question.options.forEach(opt => {
-                html += `${opt.option} = ${opt.count}<br>`;
+                const percentage = polls.length > 0 ? Math.round((opt.count / polls.length) * 100) : 0;
+                html += `<div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>${opt.option}</span>
+                    <span><strong>${opt.count}</strong> (${percentage}%)</span>
+                </div>`;
             });
             
             html += `</div>`;
@@ -464,8 +476,14 @@ K:C
         }
     }, { once: true });
 
-</script>
+    // Pievieno atbalstu Enter taustiņam admin parolei
+    document.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && document.activeElement.tagName !== 'BUTTON') {
+            // Neko nedara, lai netraucētu
+        }
+    });
 
+</script>
 
 </body>
 </html>
