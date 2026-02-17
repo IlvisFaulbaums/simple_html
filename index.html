@@ -3,85 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Poll</title>
+<title>Multi-question Poll</title>
 <style>
-  body { font-family: Arial; text-align: center; padding: 40px; background: #f4f4f4; }
-  button { padding: 12px 25px; font-size: 16px; margin: 10px; cursor: pointer; border: none; border-radius: 6px; }
-  .yes { background: #4CAF50; color: white; }
-  .no { background: #f44336; color: white; }
-  #results { margin-top: 30px; font-size: 18px; }
-  .bar { height: 20px; border-radius: 5px; margin: 5px auto; width: 300px; background: #ddd; position: relative; }
-  .fill { height: 100%; border-radius: 5px; text-align: right; padding-right: 5px; color: white; line-height: 20px; }
-  .yes-fill { background: #4CAF50; }
-  .no-fill { background: #f44336; }
+body { font-family: Arial; padding: 20px; background: #f4f4f4; text-align: center; }
+button { padding: 10px 20px; margin: 5px; font-size: 16px; cursor: pointer; border-radius: 6px; border: none; }
+.yes { background: #4CAF50; color: white; }
+.no { background: #f44336; color: white; }
+.bar { height: 20px; width: 300px; background: #ddd; border-radius: 5px; margin: 5px auto; position: relative; }
+.fill { height: 100%; text-align: right; padding-right: 5px; color: white; line-height: 20px; border-radius: 5px; }
+.yes-fill { background: #4CAF50; }
+.no-fill { background: #f44336; }
 </style>
 </head>
 <body>
 
-<h2>Do you like this poll?</h2>
-<button class="yes" onclick="vote('yes')">Yes</button>
-<button class="no" onclick="vote('no')">No</button>
-<div id="results">Loading...</div>
+<h2>Multi-question Poll</h2>
+<div id="poll"></div>
 
 <script>
-const API = "https://api.sarunas.lat"; // <-- your Worker API
+const API = "https://api.sarunas.lat";
 
-// Generate or get unique voter ID per browser/device
+// Questions
+const questions = [
+  { id: "q1", text: "Do you like this site?" },
+  { id: "q2", text: "Do you enjoy polls?" },
+  { id: "q3", text: "Do you want more questions?" }
+];
+
+// Voter ID
 function getVoterId() {
   let id = localStorage.getItem("voter_id");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("voter_id", id);
-  }
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem("voter_id", id); }
   return id;
 }
 
-// Load poll results
-async function load() {
-  try {
-    const res = await fetch(API + "/results");
+// Render poll
+async function renderPoll() {
+  const container = document.getElementById("poll");
+  container.innerHTML = "";
+  for (let q of questions) {
+    const res = await fetch(`${API}/results`);
     const data = await res.json();
+    const votes = data.filter(v => v.question_id === q.id);
 
-    let yes = data.find(r => r.option === "yes")?.count || 0;
-    let no = data.find(r => r.option === "no")?.count || 0;
+    let yes = votes.find(v => v.option === "yes")?.count || 0;
+    let no = votes.find(v => v.option === "no")?.count || 0;
     let total = yes + no;
+    let yesPercent = total ? ((yes / total)*100).toFixed(1) : 0;
+    let noPercent = total ? ((no / total)*100).toFixed(1) : 0;
 
-    let yesPercent = total ? ((yes / total) * 100).toFixed(1) : 0;
-    let noPercent = total ? ((no / total) * 100).toFixed(1) : 0;
-
-    document.getElementById("results").innerHTML = `
-      <p>Total votes: ${total}</p>
-      <div>Yes: ${yes} (${yesPercent}%)</div>
+    container.innerHTML += `
+      <h3>${q.text}</h3>
+      <button class="yes" onclick="vote('${q.id}','yes')">Yes</button>
+      <button class="no" onclick="vote('${q.id}','no')">No</button>
       <div class="bar"><div class="fill yes-fill" style="width:${yesPercent}%">${yesPercent}%</div></div>
-      <div>No: ${no} (${noPercent}%)</div>
       <div class="bar"><div class="fill no-fill" style="width:${noPercent}%">${noPercent}%</div></div>
+      <p>Total votes: ${total}</p>
     `;
-  } catch (err) {
-    document.getElementById("results").innerText = "Error loading results";
   }
 }
 
 // Submit vote
-async function vote(option) {
+async function vote(question_id, option) {
   try {
     const res = await fetch(API + "/vote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ option, voter_id: getVoterId() })
+      body: JSON.stringify({ voter_id: getVoterId(), question_id, option })
     });
-
     const data = await res.json();
-    if (data.error) alert(data.error); // prevents multiple voting
-
-    load();
-  } catch (err) {
-    alert("Error submitting vote");
-  }
+    if (data.error) alert(data.error);
+    renderPoll();
+  } catch(e) { alert("Error submitting vote"); }
 }
 
-// Initial load + auto-refresh every 2 sec
-load();
-setInterval(load, 2000);
+// Auto-refresh every 2 sec
+renderPoll();
+setInterval(renderPoll, 2000);
 </script>
 
 </body>
