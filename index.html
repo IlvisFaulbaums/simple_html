@@ -121,25 +121,6 @@
     </style>
 </head>
 <body>
-
-<h2>🎵 Live Musical Poll (D1) 🎵</h2>
-
-<div id="poll-container">
-    <div class="poll-header">
-        <h3>Loading polls...</h3>
-        <div class="vote-count" id="totalVotes">Total votes: 0</div>
-    </div>
-</div>
-
-<div>
-    <button id="resetBtn">⚠️ Reset All Votes</button>
-</div>
-
-<h3>🎼 Current Melody</h3>
-<div id="abc-notation"></div>
-<div id="notesSequence">No notes yet</div>
-<div id="results">Loading results...</div>
-
 <script>
     const API = "https://api.sarunas.lat"; // Tavs Worker URL
 
@@ -225,10 +206,11 @@
             return;
         }
 
-        questions.forEach(question => {
+        questions.forEach((question, index) => {
             const box = document.createElement("div");
             box.className = "question-box";
-            box.id = `question-${question.question_id}`;
+            box.dataset.questionId = question.question_id; // Izmanto dataset, nevis id
+            box.dataset.questionIndex = index;
             
             // Pārbauda vai lietotājs jau ir balsots par šo jautājumu
             const hasVoted = votedQuestions.has(question.question_id);
@@ -236,10 +218,10 @@
             box.innerHTML = `
                 <h3>Question ${question.question_id}</h3>
                 ${hasVoted ? '<div class="already-voted">✓ You have already voted on this question</div>' : ''}
-                <div class="options-container" id="options-${question.question_id}"></div>
+                <div class="options-container" id="options-${index}"></div>
             `;
 
-            const optionsContainer = box.querySelector(`#options-${question.question_id}`);
+            const optionsContainer = box.querySelector(`#options-${index}`);
             
             // Pievieno visas opcijas
             question.options.forEach(opt => {
@@ -282,18 +264,21 @@
                 if (response.status === 403 && data.error === "You have already voted!") {
                     // Lietotājs jau ir balsots
                     votedQuestions.add(question_id);
-                    // Atjauno pogu stāvokli
-                    const questionBox = document.getElementById(`question-${question_id}`);
-                    if (questionBox) {
-                        const alreadyVotedDiv = document.createElement("div");
-                        alreadyVotedDiv.className = "already-voted";
-                        alreadyVotedDiv.textContent = "✓ You have already voted on this question";
-                        questionBox.insertBefore(alreadyVotedDiv, questionBox.querySelector('.options-container'));
-                        
-                        // Atspējo visas pogas
-                        const buttons = questionBox.querySelectorAll('.vote-btn');
-                        buttons.forEach(btn => btn.disabled = true);
-                    }
+                    
+                    // Atjauno pogu stāvokli - atrod pareizo kasti pēc dataset
+                    const questionBoxes = document.querySelectorAll('.question-box');
+                    questionBoxes.forEach(box => {
+                        if (box.dataset.questionId === question_id) {
+                            const alreadyVotedDiv = document.createElement("div");
+                            alreadyVotedDiv.className = "already-voted";
+                            alreadyVotedDiv.textContent = "✓ You have already voted on this question";
+                            box.insertBefore(alreadyVotedDiv, box.querySelector('.options-container'));
+                            
+                            // Atspējo visas pogas
+                            const buttons = box.querySelectorAll('.vote-btn');
+                            buttons.forEach(btn => btn.disabled = true);
+                        }
+                    });
                 }
                 throw new Error(data.error || "Vote failed");
             }
@@ -455,7 +440,7 @@ K:C
     // Aprēķina kopējo balsu skaitu
     // ------------------
     function updateTotalVotes() {
-        const totalVotes = polls.reduce((sum, item) => sum + item.count, 0);
+        const totalVotes = polls.reduce((sum, item) => sum + (item.count || 0), 0);
         const totalElement = document.getElementById("totalVotes");
         if (totalElement) {
             totalElement.textContent = `Total votes: ${totalVotes}`;
@@ -466,12 +451,6 @@ K:C
     // Inicializācija
     // ------------------
     
-    // Pārbauda vai lietotājs jau ir balsojis par kādu jautājumu
-    async function checkVotedQuestions() {
-        // Šeit varētu būt API, kas atgriež lietotāja balsojumus
-        // Pašlaik mēs to uzzinām tikai balsojot
-    }
-
     // Sākumā ielādē aptaujas
     loadPolls();
     
@@ -486,6 +465,7 @@ K:C
     }, { once: true });
 
 </script>
+
 
 </body>
 </html>
