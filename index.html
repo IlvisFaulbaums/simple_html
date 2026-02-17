@@ -81,16 +81,16 @@ button:active {
   gap: 8px;
 }
 
-.vote-btn.quarter {
-  background: #4CAF50;
+.vote-btn.whole {
+  background: #9C27B0;
 }
 
 .vote-btn.half {
   background: #FF9800;
 }
 
-.vote-btn.whole {
-  background: #9C27B0;
+.vote-btn.quarter {
+  background: #4CAF50;
 }
 
 .vote-btn.eighth {
@@ -146,20 +146,20 @@ button:active {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.stat-card.quarter {
-  border-top: 4px solid #4CAF50;
+.stat-card.whole {
+  border-top: 4px solid #9C27B0;
 }
 
 .stat-card.half {
   border-top: 4px solid #FF9800;
 }
 
-.stat-card.eighth {
-  border-top: 4px solid #2196F3;
+.stat-card.quarter {
+  border-top: 4px solid #4CAF50;
 }
 
-.stat-card.whole {
-  border-top: 4px solid #9C27B0;
+.stat-card.eighth {
+  border-top: 4px solid #2196F3;
 }
 
 .stat-card h4 {
@@ -220,15 +220,15 @@ button:active {
 }
 
 /* Duration colors */
-.quarter-bg { background: #4CAF50; }
-.half-bg { background: #FF9800; }
-.eighth-bg { background: #2196F3; }
 .whole-bg { background: #9C27B0; }
+.half-bg { background: #FF9800; }
+.quarter-bg { background: #4CAF50; }
+.eighth-bg { background: #2196F3; }
 
-.quarter-text { color: #4CAF50; }
-.half-text { color: #FF9800; }
-.eighth-text { color: #2196F3; }
 .whole-text { color: #9C27B0; }
+.half-text { color: #FF9800; }
+.quarter-text { color: #4CAF50; }
+.eighth-text { color: #2196F3; }
 </style>
 </head>
 <body>
@@ -264,12 +264,12 @@ button:active {
     </select>
   </div>
 
-  <!-- Duration Legend - CORRECTED -->
+  <!-- CORRECTED Duration Legend -->
   <div style="display: flex; gap: 15px; justify-content: center; margin: 10px 0; padding: 10px; background: #e0e0e0; border-radius: 4px; flex-wrap: wrap;">
-    <span><span class="whole-text">𝅝</span> C1 = Whole (4 beats)</span>
-    <span><span class="half-text">𝅗𝅥</span> C2 = Half (2 beats)</span>
-    <span><span class="quarter-text">♩</span> C4 = Quarter (1 beat)</span>
-    <span><span class="eighth-text">♪</span> C8 = Eighth (½ beat)</span>
+    <span><span class="whole-text">𝅝</span> C1 = Whole note (4 beats)</span>
+    <span><span class="half-text">𝅗𝅥</span> C2 = Half note (2 beats)</span>
+    <span><span class="quarter-text">♩</span> C4 = Quarter note (1 beat)</span>
+    <span><span class="eighth-text">♪</span> C8 = Eighth note (½ beat)</span>
   </div>
 
   <!-- ABC Notation Display -->
@@ -316,8 +316,8 @@ const noteFrequencyMap = {
   'B': 493.88
 };
 
-// CORRECTED: Duration to beats mapping (ABC standard)
-// Lower number = longer duration
+// CORRECTED: Duration to beats mapping based on note value
+// In standard notation, smaller number = longer duration
 const durationToBeats = {
   '1': 4,  // Whole note (semibreve) - 4 beats
   '2': 2,  // Half note (minim) - 2 beats
@@ -377,7 +377,7 @@ async function initAudio() {
   }
 }
 
-// Play a note with specific duration from ABC notation - CORRECTED
+// Play a note with specific duration from ABC notation
 async function playABCNote(abcNote) {
   try {
     await initAudio();
@@ -392,7 +392,7 @@ async function playABCNote(abcNote) {
     const beatDuration = 60 / tempo; // Duration of one quarter note in seconds
     const noteDuration = beatDuration * durationToBeats[parsed.duration];
     
-    console.log(`Playing ${abcNote}: ${parsed.pitch} at ${frequency}Hz for ${noteDuration}s (${durationToBeats[parsed.duration]} beats)`);
+    console.log(`Playing ${abcNote}: ${parsed.pitch} at ${frequency}Hz for ${noteDuration.toFixed(2)}s (${durationToBeats[parsed.duration]} beats)`);
     
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -406,13 +406,20 @@ async function playABCNote(abcNote) {
     gainNode.gain.linearRampToValueAtTime(volume, now + 0.05);
     
     // Different sustain for longer notes
-    if (parsed.duration === '1' || parsed.duration === '2') {
-      // Longer sustain for whole and half notes
+    if (parsed.duration === '1') {
+      // Whole note - long sustain
+      gainNode.gain.linearRampToValueAtTime(volume * 0.8, now + noteDuration * 0.8);
+      gainNode.gain.linearRampToValueAtTime(volume * 0.6, now + noteDuration * 0.9);
+    } else if (parsed.duration === '2') {
+      // Half note - medium sustain
       gainNode.gain.linearRampToValueAtTime(volume * 0.8, now + noteDuration * 0.7);
-      gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.9);
-    } else {
-      // Shorter decay for shorter notes
+      gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.85);
+    } else if (parsed.duration === '4') {
+      // Quarter note - normal decay
       gainNode.gain.linearRampToValueAtTime(volume * 0.5, now + noteDuration * 0.5);
+    } else {
+      // Eighth note - quick decay
+      gainNode.gain.linearRampToValueAtTime(volume * 0.3, now + noteDuration * 0.3);
     }
     
     gainNode.gain.exponentialRampToValueAtTime(0.01, now + noteDuration);
@@ -553,7 +560,7 @@ function votesToABC(data) {
       currentMeasureBeats += durationToBeats[parsed.duration];
       
       // Add bar line when measure is full (4 beats) or at the end
-      if (currentMeasureBeats >= 3.9 || index === allNotes.length - 1) { // Using 3.9 to account for floating point
+      if (Math.abs(currentMeasureBeats - 4) < 0.01 || currentMeasureBeats > 3.99 || index === allNotes.length - 1) {
         abcBody += '| ';
         currentMeasureBeats = 0;
       }
@@ -714,10 +721,10 @@ function updateNoteStats(data) {
   
   // Group by duration
   const durationGroups = {
-    '1': { name: 'Whole', count: 0, notes: {}, beats: 4 },
-    '2': { name: 'Half', count: 0, notes: {}, beats: 2 },
-    '4': { name: 'Quarter', count: 0, notes: {}, beats: 1 },
-    '8': { name: 'Eighth', count: 0, notes: {}, beats: 0.5 }
+    '1': { name: 'Whole', count: 0, notes: {}, beats: 4, symbol: '𝅝' },
+    '2': { name: 'Half', count: 0, notes: {}, beats: 2, symbol: '𝅗𝅥' },
+    '4': { name: 'Quarter', count: 0, notes: {}, beats: 1, symbol: '♩' },
+    '8': { name: 'Eighth', count: 0, notes: {}, beats: 0.5, symbol: '♪' }
   };
   
   data.forEach(v => {
@@ -742,7 +749,7 @@ function updateNoteStats(data) {
       
       statsHtml += `
         <div class="stat-card ${durationColor[duration]}">
-          <h4>${group.name} (${durationSymbol[duration]})</h4>
+          <h4>${group.name} (${group.symbol})</h4>
           <div class="stat-number">${group.count}</div>
           <div style="font-size: 12px;">${group.beats} beat${group.beats !== 1 ? 's' : ''} each</div>
           <div style="font-size: 11px; margin-top: 5px; opacity: 0.8;">
