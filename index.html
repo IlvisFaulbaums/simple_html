@@ -3,29 +3,126 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dynamic Poll</title>
+<title>Dynamic Poll with Music</title>
 <style>
+@font-face {
+  font-family: 'MusiQwik';
+  src: url('musiqwik.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 body { font-family: Arial; padding: 20px; max-width: 600px; margin: auto; }
 h2 { text-align: center; }
-button { padding: 8px 15px; margin: 5px; }
+button { padding: 8px 15px; margin: 5px; cursor: pointer; transition: all 0.2s; }
+button:hover { transform: scale(1.05); }
+button:active { transform: scale(0.95); }
 #results { margin-top: 20px; }
+#admin-section { 
+  margin-top: 30px; 
+  border-top: 2px solid #ccc; 
+  padding-top: 20px;
+}
+#admin-results {
+  font-family: 'MusiQwik', Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+.vote-btn {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+.vote-btn:hover {
+  background: #45a049;
+}
+.admin-btn {
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
 </style>
 </head>
 <body>
 
-<h2>Vote on the Poll</h2>
+<h2>🎵 Vote on the Poll with Music 🎵</h2>
 <div id="poll-container"></div>
 
-<h3 id="results">Loading results...</h3>
+<h3>Results:</h3>
+<div id="results">Loading results...</div>
+
+<div id="admin-section">
+  <h3>🎼 Admin Results (MusiQwik Font) 🎼</h3>
+  <button class="admin-btn" onclick="showAdminResults()">Show Admin Results</button>
+  <div id="admin-results"></div>
+</div>
 
 <script>
 const API = "https://api.sarunas.lat"; // Your Worker URL
+
+// Audio context for playing notes
+let audioContext = null;
 
 // Generate a random voter ID for simplicity (or use login/session)
 let voterId = localStorage.getItem("voterId");
 if (!voterId) {
   voterId = 'voter_' + Date.now() + '_' + Math.floor(Math.random()*1000);
   localStorage.setItem("voterId", voterId);
+}
+
+// Musical notes mapping for different options
+const noteMap = {
+  'A': 261.63, // C4
+  'B': 293.66, // D4
+  'C': 329.63, // E4
+  'D': 349.23, // F4
+  'E': 392.00, // G4
+  'F': 440.00, // A4
+  'G': 493.88, // B4
+  'default': 440.00 // A4
+};
+
+// Function to play a note
+async function playNote(optionText) {
+  try {
+    // Initialize audio context on first user interaction
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      await audioContext.resume();
+    }
+
+    // Determine which note to play based on the option text
+    let frequency = noteMap.default;
+    const firstChar = optionText.charAt(0).toUpperCase();
+    if (noteMap[firstChar]) {
+      frequency = noteMap[firstChar];
+    }
+
+    // Create and play the note
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 1);
+    
+  } catch (error) {
+    console.log("Audio play failed:", error);
+  }
 }
 
 // Load questions dynamically
@@ -48,6 +145,7 @@ async function loadQuestions() {
     div.innerHTML = `<h3>${qid}</h3>`; // or you can replace qid with actual question text if CSV has text
     questions[qid].forEach(opt => {
       const btn = document.createElement("button");
+      btn.className = "vote-btn";
       btn.innerText = opt;
       btn.onclick = () => vote(qid, opt);
       div.appendChild(btn);
@@ -58,8 +156,11 @@ async function loadQuestions() {
   loadResults();
 }
 
-// Vote function
+// Vote function with note playing
 async function vote(questionId, option) {
+  // Play a note when voting
+  await playNote(option);
+  
   const res = await fetch(API + "/vote", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -92,11 +193,64 @@ async function loadResults() {
   document.getElementById("results").innerText = text;
 }
 
+// Show admin results with MusiQwik font
+async function showAdminResults() {
+  const res = await fetch(API + "/results");
+  const data = await res.json();
+
+  // Group results by question
+  const grouped = {};
+  data.forEach(v => {
+    if (!grouped[v.question_id]) grouped[v.question_id] = [];
+    grouped[v.question_id].push(v);
+  });
+
+  let adminText = "";
+  for (const qid in grouped) {
+    adminText += `<div style="margin-bottom: 15px;">`;
+    adminText += `<strong style="font-family: Arial;">🎵 ${qid}:</strong><br>`;
+    
+    // Sort options by count for better visualization
+    grouped[qid].sort((a, b) => b.count - a.count);
+    
+    grouped[qid].forEach(o => { 
+      // Create a musical representation based on count
+      const notes = "♪".repeat(Math.min(o.count, 10)); // Max 10 notes
+      adminText += `<span style="margin-left: 20px;">${o.option}: ${o.count} ${notes}</span><br>`;
+    });
+    adminText += `</div>`;
+  }
+  
+  // Add a musical staff representation
+  adminText += `<div style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">`;
+  adminText += `<strong>🎼 Total Votes Melody:</strong><br>`;
+  
+  // Calculate total votes
+  const totalVotes = data.reduce((sum, item) => sum + item.count, 0);
+  adminText += `<span style="font-size: 24px;">`;
+  for (let i = 0; i < Math.min(totalVotes, 20); i++) {
+    adminText += "♪";
+  }
+  adminText += ` (${totalVotes} total votes)</span>`;
+  adminText += `</div>`;
+  
+  document.getElementById("admin-results").innerHTML = adminText;
+}
+
 // Auto-refresh every 5 seconds
 setInterval(loadResults, 5000);
 
 // Initial load
 loadQuestions();
+
+// Initialize audio context on first user interaction
+document.addEventListener('click', async function initAudio() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    await audioContext.resume();
+    document.removeEventListener('click', initAudio);
+  }
+}, { once: true });
 </script>
 </body>
 </html>
