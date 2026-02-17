@@ -425,10 +425,11 @@ K:${currentKey}
   const notes = [];
 
   data.forEach(v => {
-    for (let i = 0; i < v.count; i++) {
-      notes.push(v.option);
-    }
-  });
+  for (let i = 0; i < v.count; i++) {
+    abcBody += v.option + " | ";
+  }
+});
+
 
   if (notes.length === 0) return header + "z4 |]";
 
