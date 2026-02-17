@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Musical Poll with D1</title>
+<title>Musical Poll - Sequential Questions</title>
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
 <style>
 body { font-family: Arial; padding:20px; max-width:1000px; margin:auto; background:#f5f5f5; }
@@ -18,28 +18,29 @@ button:active { transform:scale(0.95); }
 </head>
 <body>
 
-<h2>🎵 Musical Poll - Play All Database Notes 🎵</h2>
+<h2>🎵 Musical Poll - Sequential Questions 🎵</h2>
 
-<div id="poll-container">Loading polls...</div>
+<div id="poll-container">Loading first question...</div>
 
-<div id="music-section">
-  <h3>🎼 ABCJS Notation & Playback</h3>
-  <div class="playback-controls">
-    <button onclick="playAllNotes()" id="playBtn">▶️ Play ALL Notes</button>
-    <button onclick="stopPlayback()" id="stopBtn" disabled>⏹️ Stop</button>
-  </div>
-  <div id="abc-notation"></div>
-  <div id="notesSequence" style="font-family:monospace; margin-top:10px;">No notes yet</div>
+<div class="playback-controls">
+  <button onclick="playAllNotes()" id="playBtn">▶️ Play Melody</button>
+  <button onclick="stopPlayback()" id="stopBtn" disabled>⏹️ Stop</button>
+  <button onclick="resetPolls()" id="resetBtn" style="background:#f44336; color:white;">🔄 Reset Polls</button>
 </div>
 
-<h3>📊 Current Vote Results:</h3>
-<div id="results">Loading results...</div>
+<div id="abc-notation"></div>
+<div id="notesSequence" style="font-family:monospace; margin-top:10px;">Melody will appear here...</div>
+
+<h3>📊 Live Vote Results:</h3>
+<div id="results">Loading...</div>
 
 <script>
-const API = "https://YOUR_CLOUDFLARE_WORKER_URL"; // nomaini uz savu Worker URL
+const API = "https://api.sarunas.lat"; // nomaini uz savu Worker URL
 
-let currentPolls = [];
-let currentOptions = {};
+let polls = [];
+let options = {};
+let currentQuestionIndex = 0;
+let melodyNotes = [];
 let voterId = localStorage.getItem("voterId") || ('voter_'+Date.now());
 localStorage.setItem("voterId", voterId);
 
@@ -50,93 +51,64 @@ let visualObj = null;
 /* ------------------ LOAD POLLS ------------------ */
 async function loadPolls() {
   const res = await fetch(API+"/polls");
-  const polls = await res.json();
-  currentPolls = polls;
-  renderPolls();
-}
-
-async function loadOptions(poll_id) {
-  const res = await fetch(`${API}/options?poll_id=${poll_id}`);
-  const options = await res.json();
-  currentOptions[poll_id] = options;
-  return options;
-}
-
-/* ------------------ RENDER POLLS ------------------ */
-async function renderPolls() {
-  const container = document.getElementById("poll-container");
-  container.innerHTML = "";
-  for (let poll of currentPolls) {
-    const box = document.createElement("div");
-    box.innerHTML = `<h3>Poll #${poll.id}</h3>`;
-    const opts = await loadOptions(poll.id);
-    for (let opt of opts) {
-      const btn = document.createElement("button");
-      btn.className = "vote-btn";
-      btn.textContent = opt.option_text;
-      btn.onclick = ()=>vote(poll.id,opt.id);
-      box.appendChild(btn);
-    }
-    container.appendChild(box);
+  polls = await res.json();
+  for (let poll of polls) {
+    const resOpt = await fetch(`${API}/options?poll_id=${poll.id}`);
+    options[poll.id] = await resOpt.json();
   }
+  currentQuestionIndex = 0;
+  showQuestion();
   updateMusic();
   loadResults();
 }
 
-/* ------------------ VOTE ------------------ */
-async function vote(poll_id, option_id) {
+/* ------------------ SHOW SINGLE QUESTION ------------------ */
+function showQuestion() {
+  const container = document.getElementById("poll-container");
+  if (currentQuestionIndex >= polls.length) {
+    container.innerHTML = "<strong>All questions completed!</strong>";
+    return;
+  }
+  const poll = polls[currentQuestionIndex];
+  container.innerHTML = `<h3>Question #${poll.id}</h3>`;
+  options[poll.id].forEach(opt => {
+    const btn = document.createElement("button");
+    btn.className = "vote-btn";
+    btn.textContent = opt.option_text;
+    btn.onclick = ()=>submitVote(poll.id,opt.id,opt.option_text);
+    container.appendChild(btn);
+  });
+}
+
+/* ------------------ SUBMIT VOTE ------------------ */
+async function submitVote(poll_id, option_id, noteText) {
   await fetch(API+"/vote", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({voter_id:voterId,poll_id,poll_id,option_id})
+    body:JSON.stringify({voter_id:voterId, poll_id, option_id})
   });
-  loadPolls();
+  melodyNotes.push(noteText);  // pievieno izvēlēto noti melodijai
+  currentQuestionIndex++;
+  showQuestion();
+  updateMusic();
+  loadResults();
 }
 
-/* ------------------ LOAD RESULTS ------------------ */
-async function loadResults() {
-  let html = "";
-  for (let poll of currentPolls) {
-    html += `<strong>Poll #${poll.id}</strong><br>`;
-    const opts = currentOptions[poll.id] || [];
-    for (let opt of opts) {
-      html += `${opt.option_text} = ${opt.votes}<br>`;
-    }
-    html += "<br>";
-  }
-  document.getElementById("results").innerHTML = html || "No votes yet";
-}
-
-/* ------------------ ABCJS & PLAYBACK ------------------ */
-function parseNotesFromOptions() {
-  let notes = [];
-  for (let poll of currentPolls) {
-    const opts = currentOptions[poll.id] || [];
-    for (let opt of opts) {
-      for(let i=0;i<opt.votes;i++) {
-        notes.push(opt.option_text);
-      }
-    }
-  }
-  return notes;
-}
-
-function buildABCString() {
+/* ------------------ BUILD ABC ------------------ */
+function buildABC() {
   const header = `X:1
-T:All Database Notes
+T:Live Melody
 M:4/4
 L:1/4
 K:C
 `;
-  const notes = parseNotesFromOptions();
-  let body = notes.map(n=>n+" |").join(" ");
-  if (!body) body="z4 |";
-  document.getElementById("notesSequence").textContent = notes.join(" | ");
-  return header + body;
+  const body = melodyNotes.map(n=>n+" |").join(" ");
+  document.getElementById("notesSequence").textContent = melodyNotes.join(" | ");
+  return header + (body||"z4 |");
 }
 
 function updateMusic() {
-  const abc = buildABCString();
+  const abc = buildABC();
   document.getElementById("abc-notation").innerHTML="";
   try {
     visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
@@ -145,11 +117,11 @@ function updateMusic() {
 
 /* ------------------ PLAYBACK ------------------ */
 async function playAllNotes() {
-  if (!currentPolls.length) return;
+  if (!melodyNotes.length) return;
   if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
   if (!abcSynth) abcSynth = new ABCJS.synth.CreateSynth();
 
-  const abc = buildABCString();
+  const abc = buildABC();
   visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
 
   await abcSynth.init({visualObj, audioContext});
@@ -165,10 +137,35 @@ function stopPlayback() {
   document.getElementById("stopBtn").disabled = true;
 }
 
+/* ------------------ RESET POLLS ------------------ */
+async function resetPolls() {
+  if(!confirm("Are you sure you want to reset all polls?")) return;
+  await fetch(API+"/admin/reset", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({password:"YOUR_ADMIN_PASSWORD"})
+  });
+  melodyNotes = [];
+  loadPolls();
+}
+
+/* ------------------ LIVE RESULTS ------------------ */
+function loadResults() {
+  let html = "";
+  for (let poll of polls) {
+    html += `<strong>Question #${poll.id}</strong><br>`;
+    (options[poll.id]||[]).forEach(opt=>{
+      html += `${opt.option_text} = ${opt.votes}<br>`;
+    });
+    html += "<br>";
+  }
+  document.getElementById("results").innerHTML = html || "No votes yet";
+}
+
 /* ------------------ INIT ------------------ */
 loadPolls();
-setInterval(loadPolls,5000);
-</script>
+setInterval(loadResults, 3000); // atjauno rezultātus ik 3 sekundes
 
+</script>
 </body>
 </html>
