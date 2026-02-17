@@ -3,85 +3,256 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dynamic Poll with Music</title>
+<title>Dynamic Poll with ABCJS Music</title>
+<!-- ABCJS library for music notation -->
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
 <style>
-@font-face {
-  font-family: 'MusiQwik';
-  src: url('musiqwik.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
+body { 
+  font-family: Arial; 
+  padding: 20px; 
+  max-width: 800px; 
+  margin: auto; 
+  background: #f5f5f5;
 }
 
-body { font-family: Arial; padding: 20px; max-width: 600px; margin: auto; }
-h2 { text-align: center; }
-button { padding: 8px 15px; margin: 5px; cursor: pointer; transition: all 0.2s; }
-button:hover { transform: scale(1.05); }
-button:active { transform: scale(0.95); }
-#results { margin-top: 20px; }
-#admin-section { 
+h2 { 
+  text-align: center; 
+  color: #333;
+}
+
+button { 
+  padding: 10px 20px; 
+  margin: 5px; 
+  cursor: pointer; 
+  transition: all 0.2s;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+button:hover { 
+  transform: scale(1.05); 
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+button:active { 
+  transform: scale(0.95); 
+}
+
+#poll-container {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+#results { 
+  margin-top: 20px; 
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+#music-section { 
   margin-top: 30px; 
-  border-top: 2px solid #ccc; 
+  border-top: 2px solid #4CAF50; 
   padding-top: 20px;
 }
-#admin-results {
-  font-family: 'MusiQwik', Arial, sans-serif;
-  font-size: 18px;
-  line-height: 1.6;
-  padding: 15px;
-  background: #f9f9f9;
-  border-radius: 5px;
-  margin-top: 10px;
+
+#abc-notation {
+  background: #fff9e6;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 15px 0;
+  border: 2px solid #4CAF50;
+  min-height: 150px;
+  overflow-x: auto;
 }
+
 .vote-btn {
   background: #4CAF50;
   color: white;
-  border: none;
-  border-radius: 4px;
-  font-weight: bold;
+  font-size: 16px;
+  min-width: 80px;
 }
+
 .vote-btn:hover {
   background: #45a049;
 }
-.admin-btn {
+
+.music-btn {
+  background: #9C27B0;
+  color: white;
+  font-size: 16px;
+}
+
+.playback-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 15px 0;
+  padding: 15px;
+  background: #e8f5e8;
+  border-radius: 8px;
+}
+
+.playback-btn {
   background: #2196F3;
   color: white;
-  border: none;
-  border-radius: 4px;
+  padding: 10px 20px;
+  min-width: 100px;
 }
-.musical-note {
+
+.playback-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  padding: 8px 15px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.note-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.stat-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  border-top: 4px solid #4CAF50;
+}
+
+.stat-card h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.stat-number {
   font-size: 24px;
-  margin-right: 5px;
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+.question-box {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.question-box h3 {
+  margin-top: 0;
+  color: #333;
+  border-bottom: 2px solid #4CAF50;
+  padding-bottom: 5px;
+}
+
+#playback-status {
+  font-family: monospace;
+  padding: 10px;
+  background: #333;
+  color: #0f0;
+  border-radius: 4px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.key-selector {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: white;
+}
+
+.volume-slider {
+  width: 100px;
 }
 </style>
 </head>
 <body>
 
-<h2>🎵 Vote on the Musical Poll 🎵</h2>
-<div id="poll-container"></div>
+<h2>🎵 Musical Voting Poll with ABCJS 🎵</h2>
 
-<h3>Results:</h3>
-<div id="results">Loading results...</div>
+<div id="poll-container">Loading questions...</div>
 
-<div id="admin-section">
-  <h3>🎼 Admin Results (MusiQwik Font) 🎼</h3>
-  <button class="admin-btn" onclick="showAdminResults()">Show Admin Results</button>
-  <div id="admin-results"></div>
+<div id="music-section">
+  <h3>🎼 Live Musical Score</h3>
+  
+  <div class="playback-controls">
+    <button class="playback-btn" onclick="playVoteMelody()" id="playBtn">▶️ Play Votes</button>
+    <button class="playback-btn" onclick="stopVoteMelody()" id="stopBtn" disabled>⏹️ Stop</button>
+    
+    <div class="speed-control">
+      <label>Tempo:</label>
+      <input type="range" id="tempo" min="60" max="180" step="5" value="120" onchange="updateTempo()">
+      <span id="tempoValue">120</span>
+    </div>
+    
+    <div class="speed-control">
+      <label>Volume:</label>
+      <input type="range" id="volume" min="0" max="1" step="0.1" value="0.5" class="volume-slider" onchange="updateVolume()">
+    </div>
+    
+    <select id="key-signature" class="key-selector" onchange="updateMusicScore()">
+      <option value="C">Key of C</option>
+      <option value="G">Key of G</option>
+      <option value="D">Key of D</option>
+      <option value="A">Key of A</option>
+      <option value="F">Key of F</option>
+    </select>
+  </div>
+
+  <!-- ABC Notation Display -->
+  <div id="abc-notation"></div>
+  
+  <!-- Playback Status -->
+  <div id="playback-status">Ready to play</div>
+
+  <!-- Note Statistics -->
+  <div class="note-stats" id="noteStats"></div>
 </div>
+
+<h3>📊 Current Results:</h3>
+<div id="results">Loading results...</div>
 
 <script>
 const API = "https://api.sarunas.lat"; // Your Worker URL
 
 // Audio context for playing notes
 let audioContext = null;
+let isPlaying = false;
+let currentTimeout = null;
+let currentNoteIndex = 0;
+let volume = 0.5;
+let tempo = 120;
+let currentKey = 'C';
+let currentVoteData = [];
 
-// Generate a random voter ID for simplicity (or use login/session)
+// Generate a random voter ID
 let voterId = localStorage.getItem("voterId");
 if (!voterId) {
   voterId = 'voter_' + Date.now() + '_' + Math.floor(Math.random()*1000);
   localStorage.setItem("voterId", voterId);
 }
 
-// Musical notes frequency mapping (solfège to frequency)
+// Musical notes frequency mapping
 const noteFrequencyMap = {
   'DO': 261.63,  // C4
   'RE': 293.66,  // D4
@@ -92,30 +263,45 @@ const noteFrequencyMap = {
   'SI': 493.88   // B4
 };
 
-// Musical note symbols for display
-const noteSymbolMap = {
-  'DO': '𝅝',  // Whole note
-  'RE': '𝅗𝅥',  // Half note
-  'MI': '𝅘𝅥',  // Quarter note
-  'FA': '𝅘𝅥𝅮',  // Eighth note
-  'SOL': '𝅘𝅥𝅯', // Sixteenth note
-  'LA': '𝅘𝅥𝅰',  // Thirty-second note
-  'SI': '𝅘𝅥𝅱'   // Sixty-fourth note
+// Musical notes mapping to ABC notation
+const noteToABC = {
+  'DO': 'C',
+  'RE': 'D',
+  'MI': 'E',
+  'FA': 'F',
+  'SOL': 'G',
+  'LA': 'A',
+  'SI': 'B'
 };
 
-// Function to play a musical note
-async function playNote(noteName) {
+// Colors for different notes
+const noteColors = {
+  'DO': '#FF6B6B',
+  'RE': '#4ECDC4',
+  'MI': '#45B7D1',
+  'FA': '#96CEB4',
+  'SOL': '#FFEAA7',
+  'LA': '#DDA0DD',
+  'SI': '#FAA0A0'
+};
+
+// Initialize audio context
+async function initAudio() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume();
+  }
+}
+
+// Play a single note using Web Audio API
+async function playNote(noteName, duration = 0.5) {
   try {
-    // Initialize audio context on first use
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      await audioContext.resume();
-    }
-
-    // Get frequency for the note (default to 440Hz if not found)
+    await initAudio();
+    
     const frequency = noteFrequencyMap[noteName] || 440.00;
-
-    // Create and play the note
+    
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
     
@@ -123,21 +309,183 @@ async function playNote(noteName) {
     oscillator.frequency.value = frequency;
     
     // Envelope for a nice note sound
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
-    gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.3);
-    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1);
+    const now = audioContext.currentTime;
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(volume, now + 0.05);
+    gainNode.gain.linearRampToValueAtTime(volume * 0.7, now + duration * 0.3);
+    gainNode.gain.linearRampToValueAtTime(0, now + duration);
     
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
     
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 1);
+    oscillator.start(now);
+    oscillator.stop(now + duration);
     
-    console.log(`Playing note: ${noteName} (${frequency}Hz)`);
+    return new Promise(resolve => {
+      setTimeout(resolve, duration * 1000);
+    });
     
   } catch (error) {
     console.log("Audio play failed:", error);
+    return Promise.resolve();
+  }
+}
+
+// Play the full sequence of votes
+async function playVoteMelody() {
+  if (isPlaying) {
+    stopVoteMelody();
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (!currentVoteData || currentVoteData.length === 0) {
+    alert("No votes to play yet");
+    return;
+  }
+  
+  // Update button states
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  
+  isPlaying = true;
+  currentNoteIndex = 0;
+  
+  // Collect all notes from votes (expanded by count)
+  const allNotes = [];
+  currentVoteData.forEach(v => {
+    for (let i = 0; i < v.count; i++) {
+      allNotes.push(v.option);
+    }
+  });
+  
+  if (allNotes.length === 0) {
+    document.getElementById('playback-status').innerHTML = 'No votes to play';
+    stopVoteMelody();
+    return;
+  }
+  
+  document.getElementById('playback-status').innerHTML = `Playing: 0/${allNotes.length} notes`;
+  
+  // Play each note in sequence
+  for (let i = 0; i < allNotes.length; i++) {
+    if (!isPlaying) break;
+    
+    currentNoteIndex = i;
+    const note = allNotes[i];
+    const duration = 60 / tempo; // Convert BPM to seconds per quarter note
+    
+    document.getElementById('playback-status').innerHTML = `Playing: ${i+1}/${allNotes.length} notes (${note})`;
+    
+    await playNote(note, duration);
+  }
+  
+  if (isPlaying) {
+    document.getElementById('playback-status').innerHTML = 'Playback complete!';
+  }
+  
+  stopVoteMelody();
+}
+
+// Stop playback
+function stopVoteMelody() {
+  isPlaying = false;
+  if (currentTimeout) {
+    clearTimeout(currentTimeout);
+    currentTimeout = null;
+  }
+  
+  document.getElementById('playBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('playback-status').innerHTML = 'Stopped';
+}
+
+// Update tempo
+function updateTempo() {
+  tempo = parseInt(document.getElementById('tempo').value);
+  document.getElementById('tempoValue').textContent = tempo;
+  updateMusicScore();
+}
+
+// Update volume
+function updateVolume() {
+  volume = parseFloat(document.getElementById('volume').value);
+}
+
+// Update key signature
+function updateKey() {
+  currentKey = document.getElementById('key-signature').value;
+  updateMusicScore();
+}
+
+// Convert votes to ABC notation
+function votesToABC(data) {
+  const tempo = document.getElementById('tempo').value;
+  let abcHeader = `X:1\nT:Current Votes\nC:Live Poll\nM:4/4\nL:1/8\nQ:1/4=${tempo}\nK:${currentKey}\n`;
+  
+  // Collect all notes from votes
+  const allNotes = [];
+  data.forEach(v => {
+    for (let i = 0; i < v.count; i++) {
+      allNotes.push(v.option);
+    }
+  });
+  
+  if (allNotes.length === 0) {
+    return abcHeader + "z4 |]"; // Rest if no votes
+  }
+  
+  // Create melody with quarter notes
+  let abcBody = allNotes.map(note => {
+    const abcNote = noteToABC[note] || 'C';
+    return abcNote + '4';
+  }).join(' ');
+  
+  // Add bar lines every 4 notes
+  const notes = abcBody.split(' ');
+  let formattedBody = '';
+  for (let i = 0; i < notes.length; i++) {
+    if (i > 0 && i % 4 === 0) {
+      formattedBody += '| ';
+    }
+    formattedBody += notes[i] + ' ';
+  }
+  formattedBody += '|]';
+  
+  return abcHeader + formattedBody;
+}
+
+// Update music score display
+function updateMusicScore() {
+  if (currentVoteData.length > 0) {
+    const abcNotation = votesToABC(currentVoteData);
+    renderABC(abcNotation);
+  }
+}
+
+// Render ABC notation
+function renderABC(abcNotation) {
+  const visualOptions = {
+    paddingtop: 20,
+    paddingbottom: 20,
+    paddingleft: 20,
+    paddingright: 20,
+    staffwidth: 700,
+    responsive: 'resize'
+  };
+  
+  // Clear previous content
+  document.getElementById('abc-notation').innerHTML = '';
+  
+  // Render the notation
+  try {
+    ABCJS.renderAbc(
+      'abc-notation', 
+      abcNotation, 
+      visualOptions
+    );
+  } catch (e) {
+    console.error("ABC rendering error:", e);
+    document.getElementById('abc-notation').innerHTML = '<p style="color: red">Error rendering notation</p>';
   }
 }
 
@@ -145,6 +493,9 @@ async function playNote(noteName) {
 async function loadQuestions() {
   const res = await fetch(API + "/results");
   const data = await res.json();
+
+  // Store current vote data
+  currentVoteData = data;
 
   // Group by question
   const questions = {};
@@ -158,40 +509,32 @@ async function loadQuestions() {
 
   for (const qid in questions) {
     const div = document.createElement("div");
+    div.className = "question-box";
     div.innerHTML = `<h3>Question ${qid}</h3>`;
     questions[qid].forEach(opt => {
       const btn = document.createElement("button");
       btn.className = "vote-btn";
       btn.innerText = opt;
-      // Add a musical note emoji based on the option
-      const noteEmoji = getNoteEmoji(opt);
-      btn.innerHTML = `${noteEmoji} ${opt}`;
+      btn.style.background = noteColors[opt] || '#4CAF50';
       btn.onclick = () => vote(qid, opt);
       div.appendChild(btn);
     });
     container.appendChild(div);
   }
 
+  // Update music score with new data
+  const abcNotation = votesToABC(data);
+  renderABC(abcNotation);
+  
+  // Update note statistics
+  updateNoteStats(data);
+  
   loadResults();
-}
-
-// Helper function to get emoji for note
-function getNoteEmoji(note) {
-  const emojiMap = {
-    'DO': '🎵',
-    'RE': '🎶',
-    'MI': '🎵',
-    'FA': '🎶',
-    'SOL': '🎵',
-    'LA': '🎶',
-    'SI': '🎵'
-  };
-  return emojiMap[note] || '🎵';
 }
 
 // Vote function with note playing
 async function vote(questionId, option) {
-  // Play the musical note from the option (DO, RE, MI, etc.)
+  // Play the musical note
   await playNote(option);
   
   const res = await fetch(API + "/vote", {
@@ -202,7 +545,9 @@ async function vote(questionId, option) {
 
   const data = await res.json();
   if (data.error) alert(data.error);
-  loadResults();
+  
+  // Reload everything
+  loadQuestions();
 }
 
 // Load live results
@@ -217,98 +562,86 @@ async function loadResults() {
     grouped[v.question_id].push(v);
   });
 
-  let text = "";
+  let html = "";
   for (const qid in grouped) {
-    text += `Question ${qid}: `;
-    grouped[qid].forEach(o => { text += `${o.option}=${o.count} | `; });
-    text += "\n";
-  }
-  document.getElementById("results").innerText = text;
-}
-
-// Show admin results with MusiQwik font
-async function showAdminResults() {
-  const res = await fetch(API + "/results");
-  const data = await res.json();
-
-  // Group results by question
-  const grouped = {};
-  data.forEach(v => {
-    if (!grouped[v.question_id]) grouped[v.question_id] = [];
-    grouped[v.question_id].push(v);
-  });
-
-  let adminText = "<div style='font-family: MusiQwik, Arial;'>";
-  
-  for (const qid in grouped) {
-    adminText += `<div style="margin-bottom: 20px;">`;
-    adminText += `<div style="font-family: Arial; font-weight: bold; font-size: 20px;">🎼 Question ${qid}:</div>`;
-    
-    // Sort options by count for better visualization
-    grouped[qid].sort((a, b) => b.count - a.count);
-    
+    html += `<div style="margin-bottom: 15px;">`;
+    html += `<strong>Question ${qid}:</strong><br>`;
     grouped[qid].forEach(o => { 
-      // Create a musical staff representation
-      const noteSymbol = noteSymbolMap[o.option] || '♪';
-      const notes = noteSymbol.repeat(Math.min(o.count, 8)); // Max 8 notes per line
-      
-      adminText += `<div style="margin: 10px 0; font-size: 24px;">`;
-      adminText += `<span style="font-family: Arial; font-size: 16px;">${o.option}:</span> `;
-      adminText += `<span style="font-size: 28px;">${notes}</span>`;
-      adminText += `<span style="font-family: Arial; font-size: 14px; margin-left: 10px;">(${o.count} votes)</span>`;
-      adminText += `</div>`;
+      html += `<span style="display: inline-block; margin: 5px; padding: 5px 10px; background: ${noteColors[o.option] || '#eee'}; border-radius: 4px;">`;
+      html += `${o.option}=${o.count}`;
+      html += `</span> `;
     });
-    
-    adminText += `</div>`;
+    html += `</div>`;
   }
   
-  // Add a musical staff summary
-  adminText += `<div style="margin-top: 30px; border-top: 2px solid #333; padding-top: 20px;">`;
-  adminText += `<div style="font-family: Arial; font-weight: bold;">🎵 Musical Score Summary:</div>`;
-  adminText += `<div style="font-family: MusiQwik; font-size: 32px; line-height: 1.8;">`;
-  
-  // Create a melody from all votes
-  const allNotes = [];
-  data.forEach(v => {
-    for (let i = 0; i < v.count; i++) {
-      allNotes.push(v.option);
-    }
-  });
-  
-  // Display first 16 notes as a melody
-  const melodyNotes = allNotes.slice(0, 16);
-  melodyNotes.forEach(note => {
-    adminText += noteSymbolMap[note] || '♪';
-    adminText += ' ';
-  });
-  
-  if (allNotes.length > 16) {
-    adminText += ' …';
+  if (html === "") {
+    html = "No votes yet";
   }
   
-  adminText += `</div>`;
-  adminText += `<div style="font-family: Arial; font-size: 14px; margin-top: 10px;">Total votes: ${allNotes.length}</div>`;
-  adminText += `</div>`;
-  
-  adminText += "</div>";
-  
-  document.getElementById("admin-results").innerHTML = adminText;
+  document.getElementById("results").innerHTML = html;
 }
 
-// Auto-refresh every 5 seconds
-setInterval(loadResults, 5000);
+// Update note statistics
+function updateNoteStats(data) {
+  const stats = document.getElementById('noteStats');
+  
+  // Count votes per note
+  const noteCounts = {};
+  data.forEach(v => {
+    noteCounts[v.option] = (noteCounts[v.option] || 0) + v.count;
+  });
+  
+  let statsHtml = '';
+  const notes = ['DO', 'RE', 'MI', 'FA', 'SOL'];
+  
+  notes.forEach(note => {
+    const count = noteCounts[note] || 0;
+    
+    statsHtml += `
+      <div class="stat-card" style="border-top-color: ${noteColors[note]}">
+        <h4>${note}</h4>
+        <div class="stat-number">${count}</div>
+        <div style="font-size: 12px;">${noteToABC[note]}</div>
+      </div>
+    `;
+  });
+  
+  // Add total
+  const totalVotes = data.reduce((sum, v) => sum + v.count, 0);
+  statsHtml += `
+    <div class="stat-card" style="border-top-color: #333;">
+      <h4>Total</h4>
+      <div class="stat-number">${totalVotes}</div>
+      <div style="font-size: 12px;">votes</div>
+    </div>
+  `;
+  
+  stats.innerHTML = statsHtml;
+}
+
+// Auto-refresh every 5 seconds (but don't interrupt playback)
+setInterval(() => { 
+  if (!isPlaying) {
+    loadQuestions(); 
+  }
+}, 5000);
 
 // Initial load
 loadQuestions();
 
-// Initialize audio context on first user interaction
-document.addEventListener('click', async function initAudio() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    await audioContext.resume();
-    document.removeEventListener('click', initAudio);
-  }
+// Initialize audio on first click
+document.addEventListener('click', function initAudioOnFirstClick() {
+  initAudio();
+  document.removeEventListener('click', initAudioOnFirstClick);
 }, { once: true });
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+  stopVoteMelody();
+  if (audioContext) {
+    audioContext.close();
+  }
+});
 </script>
 </body>
 </html>
