@@ -3,557 +3,171 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Musical Poll - Play All Database Notes</title>
-<!-- ABCJS library for music notation and playback -->
+<title>Musical Poll with D1</title>
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
 <style>
-body { 
-  font-family: Arial; 
-  padding: 20px; 
-  max-width: 1000px; 
-  margin: auto; 
-  background: #f5f5f5;
-}
-
-h2 { 
-  text-align: center; 
-  color: #333;
-}
-
-button { 
-  padding: 10px 20px; 
-  margin: 5px; 
-  cursor: pointer; 
-  transition: all 0.2s;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-}
-
-button:hover { 
-  transform: scale(1.05); 
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
-
-button:active { 
-  transform: scale(0.95); 
-}
-
-#poll-container {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  margin-bottom: 20px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-#results { 
-  margin-top: 20px; 
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-
-#music-section { 
-  margin-top: 30px; 
-  border-top: 2px solid #4CAF50; 
-  padding-top: 20px;
-}
-
-#abc-notation {
-  background: #fff9e6;
-  padding: 20px;
-  border-radius: 8px;
-  margin: 15px 0;
-  border: 2px solid #4CAF50;
-  min-height: 200px;
-  overflow-x: auto;
-}
-
-.vote-btn {
-  color: white;
-  font-size: 14px;
-  min-width: 100px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
-/* Note duration colors */
-.vote-btn.whole-note { background: #9C27B0; } /* Purple - 4 beats */
-.vote-btn.half-note { background: #FF9800; }  /* Orange - 2 beats */
-.vote-btn.quarter-note { background: #4CAF50; } /* Green - 1 beat */
-.vote-btn.eighth-note { background: #2196F3; } /* Blue - 0.5 beat */
-
-.playback-controls {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin: 15px 0;
-  padding: 15px;
-  background: #e8f5e8;
-  border-radius: 8px;
-}
-
-.playback-btn {
-  background: #2196F3;
-  color: white;
-  padding: 10px 20px;
-  min-width: 120px;
-  font-size: 16px;
-}
-
-.playback-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.playback-btn.stop-btn {
-  background: #f44336;
-}
-
-.speed-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: white;
-  padding: 8px 15px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-}
-
-.note-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  margin: 20px 0;
-}
-
-.stat-card {
-  background: white;
-  padding: 15px;
-  border-radius: 8px;
-  text-align: center;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.stat-card.whole-note { border-top: 4px solid #9C27B0; }
-.stat-card.half-note { border-top: 4px solid #FF9800; }
-.stat-card.quarter-note { border-top: 4px solid #4CAF50; }
-.stat-card.eighth-note { border-top: 4px solid #2196F3; }
-
-.stat-card h4 {
-  margin: 0 0 10px 0;
-  color: #333;
-  font-size: 14px;
-}
-
-.stat-number {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-.question-box {
-  margin-bottom: 15px;
-  padding: 10px;
-  background: #f9f9f9;
-  border-radius: 8px;
-}
-
-.question-box h3 {
-  margin: 0 0 10px 0;
-  color: #333;
-  font-size: 16px;
-  border-bottom: 2px solid #4CAF50;
-  padding-bottom: 5px;
-}
-
-#playback-status {
-  font-family: monospace;
-  padding: 10px;
-  background: #333;
-  color: #0f0;
-  border-radius: 4px;
-  margin-top: 10px;
-  text-align: center;
-  font-size: 14px;
-}
-
-.key-selector {
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-  background: white;
-}
-
-.volume-slider {
-  width: 100px;
-}
-
-/* Duration legend */
-.duration-legend {
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-  margin: 10px 0;
-  padding: 10px;
-  background: #e0e0e0;
-  border-radius: 4px;
-  flex-wrap: wrap;
-  font-size: 14px;
-}
-
-.duration-legend span {
-  padding: 4px 12px;
-  border-radius: 4px;
-  color: white;
-}
-
-.whole-bg { background: #9C27B0; }
-.half-bg { background: #FF9800; }
-.quarter-bg { background: #4CAF50; }
-.eighth-bg { background: #2196F3; }
-
-.all-notes-display {
-  background: #333;
-  color: white;
-  padding: 15px;
-  border-radius: 8px;
-  margin: 15px 0;
-  font-family: monospace;
-  font-size: 18px;
-  text-align: center;
-  letter-spacing: 5px;
-}
-
-.total-summary {
-  background: #4CAF50;
-  color: white;
-  padding: 15px;
-  border-radius: 8px;
-  text-align: center;
-  font-size: 18px;
-  font-weight: bold;
-}
+body { font-family: Arial; padding:20px; max-width:1000px; margin:auto; background:#f5f5f5; }
+h2 { text-align:center; color:#333; }
+button { padding:10px 20px; margin:5px; cursor:pointer; border:none; border-radius:6px; font-weight:bold; }
+button:hover { transform:scale(1.05); box-shadow:0 4px 8px rgba(0,0,0,0.2); }
+button:active { transform:scale(0.95); }
+#poll-container, #results, #abc-notation { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
+.vote-btn { margin:5px; }
+.playback-controls { display:flex; gap:10px; margin:15px 0; flex-wrap:wrap; }
 </style>
 </head>
 <body>
 
 <h2>🎵 Musical Poll - Play All Database Notes 🎵</h2>
 
-<div id="poll-container">
-  <h3 style="margin-top: 0;">Available Notes to Vote:</h3>
-  Loading questions...
-</div>
+<div id="poll-container">Loading polls...</div>
 
 <div id="music-section">
-  <h3>🎼 All Notes from Database (ABCJS Notation)</h3>
-  
-  <div class="duration-legend">
-    <span class="whole-bg">Whole Note (4 beats) - C1</span>
-    <span class="half-bg">Half Note (2 beats) - C2</span>
-    <span class="quarter-bg">Quarter Note (1 beat) - C4</span>
-    <span class="eighth-bg">Eighth Note (½ beat) - C8</span>
-  </div>
-  
+  <h3>🎼 ABCJS Notation & Playback</h3>
   <div class="playback-controls">
-    <button class="playback-btn" onclick="playAllNotes()" id="playBtn">▶️ Play ALL Notes</button>
-    <button class="playback-btn stop-btn" onclick="stopPlayback()" id="stopBtn" disabled>⏹️ Stop</button>
-    
-    <div class="speed-control">
-      <label>♩ =</label>
-      <input type="range" id="tempo" min="40" max="200" step="5" value="120" onchange="updateTempo()">
-      <span id="tempoValue">120</span>
-    </div>
-    
-    <div class="speed-control">
-      <label>Volume:</label>
-      <input type="range" id="volume" min="0" max="1" step="0.1" value="0.7" class="volume-slider" onchange="updateVolume()">
-    </div>
-    
-    <select id="key-signature" class="key-selector" onchange="updateMusicScore()">
-      <option value="C">Key of C</option>
-      <option value="G">Key of G</option>
-      <option value="D">Key of D</option>
-      <option value="A">Key of A</option>
-      <option value="F">Key of F</option>
-    </select>
+    <button onclick="playAllNotes()" id="playBtn">▶️ Play ALL Notes</button>
+    <button onclick="stopPlayback()" id="stopBtn" disabled>⏹️ Stop</button>
   </div>
-
-  <!-- ABC Notation Display -->
   <div id="abc-notation"></div>
-  
-  <!-- All Notes Sequence Display -->
-  <div class="all-notes-display" id="notesSequence">No notes yet</div>
-  
-  <!-- Playback Status -->
-  <div id="playback-status">Ready to play all notes from database</div>
-
-  <!-- Note Statistics -->
-  <div class="note-stats" id="noteStats"></div>
-  
-  <!-- Total Summary -->
-  <div class="total-summary" id="totalSummary">Loading...</div>
+  <div id="notesSequence" style="font-family:monospace; margin-top:10px;">No notes yet</div>
 </div>
 
 <h3>📊 Current Vote Results:</h3>
 <div id="results">Loading results...</div>
 
 <script>
-const API = "https://api.sarunas.lat";
+const API = "https://YOUR_CLOUDFLARE_WORKER_URL"; // nomaini uz savu Worker URL
+
+let currentPolls = [];
+let currentOptions = {};
+let voterId = localStorage.getItem("voterId") || ('voter_'+Date.now());
+localStorage.setItem("voterId", voterId);
 
 let audioContext = null;
-let isPlaying = false;
-let volume = 0.7;
-let tempo = 120;
-let currentKey = 'C';
-let currentVoteData = [];
 let abcSynth = null;
 let visualObj = null;
-let playbackTimeout = null;
 
-let voterId = localStorage.getItem("voterId");
-if (!voterId) {
-  voterId = 'voter_' + Date.now();
-  localStorage.setItem("voterId", voterId);
+/* ------------------ LOAD POLLS ------------------ */
+async function loadPolls() {
+  const res = await fetch(API+"/polls");
+  const polls = await res.json();
+  currentPolls = polls;
+  renderPolls();
 }
 
-/* ===============================
-   SAFE HELPERS
-=================================*/
-
-function safeArray(data) {
-  if (!Array.isArray(data)) return [];
-  return data.map(item => ({
-    question_id: item.question_id ?? 0,
-    option: item.option ?? "",
-    count: parseInt(item.count ?? 0)
-  }));
+async function loadOptions(poll_id) {
+  const res = await fetch(`${API}/options?poll_id=${poll_id}`);
+  const options = await res.json();
+  currentOptions[poll_id] = options;
+  return options;
 }
 
-function parseABCNote(note) {
-  const match = note.match(/^([A-Ga-g])(\d)$/);
-  if (!match) return null;
-  return { pitch: match[1], duration: match[2] };
-}
-
-function getNoteBeats(d) {
-  if (d === "1") return 4;
-  if (d === "2") return 2;
-  if (d === "4") return 1;
-  if (d === "8") return 0.5;
-  return 1;
-}
-
-/* ===============================
-   LOAD DATA
-=================================*/
-
-async function loadQuestions() {
-  try {
-    const res = await fetch(API + "/results");
-    const raw = await res.json();
-    const data = safeArray(raw);
-
-    currentVoteData = data;
-
-    buildPollButtons(data);
-    updateMusic();
-    loadResults();
-
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-/* ===============================
-   BUILD POLL BUTTONS
-=================================*/
-
-function buildPollButtons(data) {
+/* ------------------ RENDER POLLS ------------------ */
+async function renderPolls() {
   const container = document.getElementById("poll-container");
-  container.innerHTML = "<h3>Available Notes to Vote:</h3>";
-
-  const grouped = {};
-
-  data.forEach(item => {
-    if (!grouped[item.question_id])
-      grouped[item.question_id] = new Set();
-    grouped[item.question_id].add(item.option);
-  });
-
-  Object.keys(grouped).forEach(qid => {
+  container.innerHTML = "";
+  for (let poll of currentPolls) {
     const box = document.createElement("div");
-    box.className = "question-box";
-    box.innerHTML = `<h3>Question ${qid}</h3>`;
-
-    grouped[qid].forEach(option => {
-      const parsed = parseABCNote(option);
-      if (!parsed) return;
-
+    box.innerHTML = `<h3>Poll #${poll.id}</h3>`;
+    const opts = await loadOptions(poll.id);
+    for (let opt of opts) {
       const btn = document.createElement("button");
       btn.className = "vote-btn";
-      btn.textContent = option;
-      btn.onclick = () => vote(qid, option);
+      btn.textContent = opt.option_text;
+      btn.onclick = ()=>vote(poll.id,opt.id);
       box.appendChild(btn);
-    });
-
+    }
     container.appendChild(box);
-  });
+  }
+  updateMusic();
+  loadResults();
 }
 
-/* ===============================
-   ABC RENDERING
-=================================*/
+/* ------------------ VOTE ------------------ */
+async function vote(poll_id, option_id) {
+  await fetch(API+"/vote", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({voter_id:voterId,poll_id,poll_id,option_id})
+  });
+  loadPolls();
+}
 
-function votesToABC(data) function votesToABC(dataString) {
+/* ------------------ LOAD RESULTS ------------------ */
+async function loadResults() {
+  let html = "";
+  for (let poll of currentPolls) {
+    html += `<strong>Poll #${poll.id}</strong><br>`;
+    const opts = currentOptions[poll.id] || [];
+    for (let opt of opts) {
+      html += `${opt.option_text} = ${opt.votes}<br>`;
+    }
+    html += "<br>";
+  }
+  document.getElementById("results").innerHTML = html || "No votes yet";
+}
 
-  let header =
-`X:1
-T:Database Notes
+/* ------------------ ABCJS & PLAYBACK ------------------ */
+function parseNotesFromOptions() {
+  let notes = [];
+  for (let poll of currentPolls) {
+    const opts = currentOptions[poll.id] || [];
+    for (let opt of opts) {
+      for(let i=0;i<opt.votes;i++) {
+        notes.push(opt.option_text);
+      }
+    }
+  }
+  return notes;
+}
+
+function buildABCString() {
+  const header = `X:1
+T:All Database Notes
 M:4/4
 L:1/4
-Q:1/4=${tempo}
-K:${currentKey}
+K:C
 `;
-
-  if (!dataString || typeof dataString !== "string")
-    return header + "z4 |]";
-
-  // 1️⃣ Sadala abas atbildes
-  const answers = dataString.split(",");
-
-  let body = "";
-
-  answers.forEach((answer, index) => {
-
-    // 2️⃣ Sadala taktis
-    const bars = answer.split("|");
-
-    bars.forEach(bar => {
-
-      // 3️⃣ Atrod notis kā E2, G4 utt
-      const notes = bar.match(/[A-Ga-g][0-9]/g) || [];
-
-      notes.forEach(n => {
-        const pitch = n[0];
-        const duration = n[1];
-
-        body += pitch + duration + " ";
-      });
-
-      body += "| ";
-    });
-
-    // pauze starp melodijām
-    if (index < answers.length - 1)
-      body += "z4 | ";
-  });
-
-  document.getElementById("notesSequence").textContent = dataString;
-
+  const notes = parseNotesFromOptions();
+  let body = notes.map(n=>n+" |").join(" ");
+  if (!body) body="z4 |";
+  document.getElementById("notesSequence").textContent = notes.join(" | ");
   return header + body;
 }
 
-
 function updateMusic() {
-  const abc = votesToABC(currentVoteData);
-  document.getElementById("abc-notation").innerHTML = "";
+  const abc = buildABCString();
+  document.getElementById("abc-notation").innerHTML="";
   try {
     visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
-  } catch (e) {
-    console.error(e);
-  }
+  } catch(e){console.error(e);}
 }
 
-/* ===============================
-   PLAYBACK
-=================================*/
-
+/* ------------------ PLAYBACK ------------------ */
 async function playAllNotes() {
-  if (!currentVoteData.length) return;
+  if (!currentPolls.length) return;
+  if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  if (!abcSynth) abcSynth = new ABCJS.synth.CreateSynth();
 
-  if (!audioContext)
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-  if (!abcSynth)
-    abcSynth = new ABCJS.synth.CreateSynth();
-
-  const abc = votesToABC(currentVoteData);
+  const abc = buildABCString();
   visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
 
-  await abcSynth.init({
-    visualObj,
-    audioContext
-  });
-
+  await abcSynth.init({visualObj, audioContext});
   await abcSynth.prime();
   abcSynth.start();
+  document.getElementById("playBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
 }
 
 function stopPlayback() {
   if (abcSynth) abcSynth.stop();
+  document.getElementById("playBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
 }
 
-/* ===============================
-   VOTE
-=================================*/
-
-async function vote(qid, option) {
-  await fetch(API + "/vote", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      voter_id: voterId,
-      question_id: qid,
-      option
-    })
-  });
-
-  loadQuestions();
-}
-
-/* ===============================
-   RESULTS DISPLAY
-=================================*/
-
-async function loadResults() {
-  const res = await fetch(API + "/results");
-  const raw = await res.json();
-  const data = safeArray(raw);
-
-  const grouped = {};
-  data.forEach(v => {
-    if (!grouped[v.question_id])
-      grouped[v.question_id] = [];
-    grouped[v.question_id].push(v);
-  });
-
-  let html = "";
-  Object.keys(grouped).forEach(qid => {
-    html += `<strong>Question ${qid}</strong><br>`;
-    grouped[qid].forEach(v => {
-      html += `${v.option} = ${v.count}<br>`;
-    });
-    html += "<br>";
-  });
-
-  document.getElementById("results").innerHTML =
-    html || "No votes yet";
-}
-
-/* ===============================
-   INIT
-=================================*/
-
-loadQuestions();
-setInterval(loadQuestions, 5000);
+/* ------------------ INIT ------------------ */
+loadPolls();
+setInterval(loadPolls,5000);
 </script>
 
 </body>
