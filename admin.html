@@ -15,6 +15,7 @@ button.reset { background: #f44336; color: white; border: none; border-radius: 6
 <body>
 
 <h2>Admin Dashboard</h2>
+
 <div id="login">
   <input type="password" id="password" placeholder="Enter admin password">
   <button onclick="login()">Login</button>
@@ -58,11 +59,23 @@ async function loadResults() {
   const data = await res.json();
   if (data.error) { alert(data.error); return; }
 
-  let html = "<table><tr><th>Question ID</th><th>Option</th><th>Count</th></tr>";
+  // Group votes by question
+  const grouped = {};
   data.forEach(v => {
-    html += `<tr><td>${v.question_id}</td><td>${v.option}</td><td>${v.count}</td></tr>`;
+    if (!grouped[v.question_id]) grouped[v.question_id] = [];
+    grouped[v.question_id].push(v);
   });
-  html += "</table>";
+
+  let html = "";
+  Object.keys(grouped).forEach(qid => {
+    html += `<h3>Question: ${qid}</h3>`;
+    html += "<table><tr><th>Option</th><th>Votes</th></tr>";
+    grouped[qid].forEach(opt => {
+      html += `<tr><td>${opt.option}</td><td>${opt.count}</td></tr>`;
+    });
+    html += "</table>";
+  });
+
   document.getElementById("results").innerHTML = html;
 }
 
