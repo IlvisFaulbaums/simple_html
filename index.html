@@ -3,169 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Musical Poll - Sequential Questions</title>
+<title>Live Musical Poll</title>
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
 <style>
-body { font-family: Arial; padding:20px; max-width:1000px; margin:auto; background:#f5f5f5; }
-h2 { text-align:center; color:#333; }
-button { padding:10px 20px; margin:5px; cursor:pointer; border:none; border-radius:6px; font-weight:bold; }
-button:hover { transform:scale(1.05); box-shadow:0 4px 8px rgba(0,0,0,0.2); }
-button:active { transform:scale(0.95); }
-#poll-container, #results, #abc-notation { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
-.vote-btn { margin:5px; }
-.playback-controls { display:flex; gap:10px; margin:15px 0; flex-wrap:wrap; }
+body { font-family: Arial; padding: 20px; max-width: 1000px; margin: auto; background: #f5f5f5; }
+h2 { text-align: center; color: #333; }
+button { padding: 10px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; }
+button:hover { transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+button:active { transform: scale(0.95); }
+.vote-btn { margin: 5px; padding: 8px 12px; border-radius: 6px; font-weight: bold; }
+#abc-notation { background: #fff9e6; padding: 20px; border-radius: 8px; margin: 15px 0; border: 2px solid #4CAF50; min-height: 150px; overflow-x: auto; }
+#notesSequence { background: #333; color: white; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 18px; text-align: center; letter-spacing: 5px; }
+#poll-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+#results { margin-top: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+#resetBtn { background: #f44336; color: white; }
 </style>
 </head>
 <body>
 
-<h2>🎵 Musical Poll - Sequential Questions 🎵</h2>
+<h2>🎵 Live Musical Poll 🎵</h2>
 
-<div id="poll-container">Loading first question...</div>
-
-<div class="playback-controls">
-  <button onclick="playAllNotes()" id="playBtn">▶️ Play Melody</button>
-  <button onclick="stopPlayback()" id="stopBtn" disabled>⏹️ Stop</button>
-  <button onclick="resetPolls()" id="resetBtn" style="background:#f44336; color:white;">🔄 Reset Polls</button>
+<div id="poll-container">
+  Loading question...
 </div>
 
-<div id="abc-notation"></div>
-<div id="notesSequence" style="font-family:monospace; margin-top:10px;">Melody will appear here...</div>
+<div>
+  <button id="resetBtn">⚠️ Reset All Votes (Admin)</button>
+</div>
 
-<h3>📊 Live Vote Results:</h3>
-<div id="results">Loading...</div>
+<h3>🎼 Current Melody from Votes</h3>
+<div id="abc-notation"></div>
+<div id="notesSequence">No notes yet</div>
+<div id="results">Loading results...</div>
 
 <script>
-const API = "https://api.sarunas.lat"; // nomaini uz savu Worker URL
-
-let polls = [];
-let options = {};
+const API = "https://YOUR_WORKER_URL"; // <--- nomaini uz savu Worker URL
 let currentQuestionIndex = 0;
-let melodyNotes = [];
-let voterId = localStorage.getItem("voterId") || ('voter_'+Date.now());
-localStorage.setItem("voterId", voterId);
+let questions = [];
+let currentVoteData = [];
+let voterId = localStorage.getItem("voterId");
+if(!voterId) { voterId = 'voter_' + Date.now(); localStorage.setItem("voterId", voterId); }
 
-let audioContext = null;
 let abcSynth = null;
+let audioContext = null;
 let visualObj = null;
 
-/* ------------------ LOAD POLLS ------------------ */
-async function loadPolls() {
-  const res = await fetch(API+"/polls");
-  polls = await res.json();
-  for (let poll of polls) {
-    const resOpt = await fetch(`${API}/options?poll_id=${poll.id}`);
-    options[poll.id] = await resOpt.json();
-  }
-  currentQuestionIndex = 0;
-  showQuestion();
-  updateMusic();
-  loadResults();
+function safeArray(data) {
+  if(!Array.isArray(data)) return [];
+  return data.map(item=>({question_id: item.question_id??0, option: item.option??"", count: parseInt(item.count??0)}));
 }
 
-/* ------------------ SHOW SINGLE QUESTION ------------------ */
-function showQuestion() {
+// ----------------------------
+// Load polls from Worker
+// ----------------------------
+async function loadPolls() {
+  try {
+    const res = await fetch(API+"/polls");
+    const raw = await res.json();
+    const data = safeArray(raw);
+
+    // Group by question
+    const grouped = {};
+    data.forEach(v=>{
+      if(!grouped[v.question_id]) grouped[v.question_id]=[];
+      grouped[v.question_id].push(v);
+    });
+
+    questions = Object.keys(grouped).map(qid => ({question_id: qid, options: grouped[qid]}));
+    currentVoteData = data;
+    showQuestion(currentQuestionIndex);
+    updateMelody();
+    showResults();
+  } catch(e) {
+    console.error(e);
+    document.getElementById("poll-container").innerHTML = "Failed to load polls";
+  }
+}
+
+// ----------------------------
+// Show one question at a time
+// ----------------------------
+function showQuestion(idx){
   const container = document.getElementById("poll-container");
-  if (currentQuestionIndex >= polls.length) {
+  if(idx >= questions.length){
     container.innerHTML = "<strong>All questions completed!</strong>";
     return;
   }
-  const poll = polls[currentQuestionIndex];
-  container.innerHTML = `<h3>Question #${poll.id}</h3>`;
-  options[poll.id].forEach(opt => {
+  const q = questions[idx];
+  container.innerHTML = `<h3>Question ${q.question_id}</h3>`;
+  q.options.forEach(opt=>{
     const btn = document.createElement("button");
     btn.className = "vote-btn";
-    btn.textContent = opt.option_text;
-    btn.onclick = ()=>submitVote(poll.id,opt.id,opt.option_text);
+    btn.textContent = opt.option + ` (${opt.count})`;
+    btn.onclick = async ()=>{
+      await vote(q.question_id, opt.option);
+      currentQuestionIndex++;
+      showQuestion(currentQuestionIndex);
+    };
     container.appendChild(btn);
   });
 }
 
-/* ------------------ SUBMIT VOTE ------------------ */
-async function submitVote(poll_id, option_id, noteText) {
-  await fetch(API+"/vote", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({voter_id:voterId, poll_id, option_id})
-  });
-  melodyNotes.push(noteText);  // pievieno izvēlēto noti melodijai
-  currentQuestionIndex++;
-  showQuestion();
-  updateMusic();
-  loadResults();
+// ----------------------------
+// Vote for an option
+// ----------------------------
+async function vote(qid,opt){
+  try{
+    await fetch(API+"/vote",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({voter_id:voterId, question_id:qid, option:opt})
+    });
+    await loadPolls();
+    playLastNote(opt);
+  }catch(e){console.error(e);}
 }
 
-/* ------------------ BUILD ABC ------------------ */
-function buildABC() {
-  const header = `X:1
+// ----------------------------
+// Reset all votes (admin)
+// ----------------------------
+document.getElementById("resetBtn").onclick = async ()=>{
+  const pwd = prompt("Enter admin password:");
+  if(!pwd) return;
+  try{
+    await fetch(API+"/admin/reset",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({password: pwd})
+    });
+    currentQuestionIndex=0;
+    await loadPolls();
+    alert("All votes reset!");
+  }catch(e){console.error(e);}
+}
+
+// ----------------------------
+// ABCJS functions
+// ----------------------------
+function parseABCNote(note){
+  const match = note.match(/^([A-Ga-g])(\d)$/);
+  if(!match) return null;
+  return {pitch: match[1], duration: match[2]};
+}
+function getNoteBeats(d){
+  if(d==="1") return 4;
+  if(d==="2") return 2;
+  if(d==="4") return 1;
+  if(d==="8") return 0.5;
+  return 1;
+}
+
+function updateMelody(){
+  let header =
+`X:1
 T:Live Melody
 M:4/4
 L:1/4
+Q:1/4=120
 K:C
 `;
-  const body = melodyNotes.map(n=>n+" |").join(" ");
-  document.getElementById("notesSequence").textContent = melodyNotes.join(" | ");
-  return header + (body||"z4 |");
-}
-
-function updateMusic() {
-  const abc = buildABC();
-  document.getElementById("abc-notation").innerHTML="";
-  try {
-    visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
-  } catch(e){console.error(e);}
-}
-
-/* ------------------ PLAYBACK ------------------ */
-async function playAllNotes() {
-  if (!melodyNotes.length) return;
-  if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  if (!abcSynth) abcSynth = new ABCJS.synth.CreateSynth();
-
-  const abc = buildABC();
-  visualObj = ABCJS.renderAbc("abc-notation", abc)[0];
-
-  await abcSynth.init({visualObj, audioContext});
-  await abcSynth.prime();
-  abcSynth.start();
-  document.getElementById("playBtn").disabled = true;
-  document.getElementById("stopBtn").disabled = false;
-}
-
-function stopPlayback() {
-  if (abcSynth) abcSynth.stop();
-  document.getElementById("playBtn").disabled = false;
-  document.getElementById("stopBtn").disabled = true;
-}
-
-/* ------------------ RESET POLLS ------------------ */
-async function resetPolls() {
-  if(!confirm("Are you sure you want to reset all polls?")) return;
-  await fetch(API+"/admin/reset", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({password:"YOUR_ADMIN_PASSWORD"})
+  let body = "";
+  let notes = [];
+  currentVoteData.forEach(v=>{
+    for(let i=0;i<v.count;i++){
+      notes.push(v.option);
+      body += v.option + " ";
+    }
   });
-  melodyNotes = [];
-  loadPolls();
+  document.getElementById("notesSequence").textContent = notes.length ? notes.join(" | ") : "No notes yet";
+  document.getElementById("abc-notation").innerHTML = "";
+  try{
+    visualObj = ABCJS.renderAbc("abc-notation", header+body)[0];
+  }catch(e){console.error(e);}
 }
 
-/* ------------------ LIVE RESULTS ------------------ */
-function loadResults() {
-  let html = "";
-  for (let poll of polls) {
-    html += `<strong>Question #${poll.id}</strong><br>`;
-    (options[poll.id]||[]).forEach(opt=>{
-      html += `${opt.option_text} = ${opt.votes}<br>`;
-    });
-    html += "<br>";
-  }
-  document.getElementById("results").innerHTML = html || "No votes yet";
+// Play last voted note
+async function playLastNote(note){
+  if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  if(!abcSynth) abcSynth = new ABCJS.synth.CreateSynth();
+  try{
+    const abcStr =
+`X:1
+T:Last Note
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+` + note;
+    visualObj = ABCJS.renderAbc("abc-notation", abcStr)[0];
+    await abcSynth.init({visualObj,audioContext});
+    await abcSynth.prime();
+    abcSynth.start();
+  }catch(e){console.error(e);}
 }
 
-/* ------------------ INIT ------------------ */
+// ----------------------------
+// Show vote results
+// ----------------------------
+function showResults(){
+  const container = document.getElementById("results");
+  if(!currentVoteData.length){container.innerHTML="No votes yet"; return;}
+  let html="";
+  const grouped = {};
+  currentVoteData.forEach(v=>{
+    if(!grouped[v.question_id]) grouped[v.question_id]=[];
+    grouped[v.question_id].push(v);
+  });
+  Object.keys(grouped).forEach(qid=>{
+    html += `<strong>Question ${qid}</strong><br>`;
+    grouped[qid].forEach(v=>{html += `${v.option} = ${v.count}<br>`;});
+    html+="<br>";
+  });
+  container.innerHTML = html;
+}
+
+// ----------------------------
+// Init
+// ----------------------------
 loadPolls();
-setInterval(loadResults, 3000); // atjauno rezultātus ik 3 sekundes
-
+setInterval(loadPolls,5000); // live update
 </script>
+
 </body>
 </html>
