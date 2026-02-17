@@ -3,18 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard</title>
+<title>Admin Dashboard - Musical Votes</title>
 <style>
-body { font-family: Arial; padding: 20px; max-width: 800px; margin: auto; }
-input, button { padding: 8px 12px; margin: 5px; }
-table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-button.reset { background: #f44336; color: white; border: none; cursor: pointer; border-radius: 6px; }
+@font-face {
+  font-family: 'MusiQwik';
+  src: url('musiqwik.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body { 
+  font-family: Arial; 
+  padding: 20px; 
+  max-width: 1000px; 
+  margin: auto; 
+  background: #f5f5f5;
+}
+
+input, button { 
+  padding: 10px 15px; 
+  margin: 5px; 
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+button {
+  cursor: pointer;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  transition: all 0.2s;
+}
+
+button:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+table { 
+  border-collapse: collapse; 
+  width: 100%; 
+  margin-top: 15px; 
+  background: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+th, td { 
+  border: 1px solid #ccc; 
+  padding: 12px; 
+  text-align: center; 
+}
+
+th {
+  background: #333;
+  color: white;
+}
+
+button.reset { 
+  background: #f44336; 
+  color: white; 
+  border: none; 
+  cursor: pointer; 
+  border-radius: 6px;
+  padding: 12px 20px;
+  font-weight: bold;
+}
+
+#dashboard {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.music-controls {
+  background: #e8f5e8;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.music-staff {
+  font-family: 'MusiQwik', Arial, sans-serif;
+  font-size: 48px;
+  line-height: 1.8;
+  background: #fff9e6;
+  padding: 20px;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  margin: 15px 0;
+  border: 2px solid #4CAF50;
+}
+
+.note-indicator {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  border-radius: 50%;
+  background: #4CAF50;
+  color: white;
+  margin: 0 2px;
+  font-size: 14px;
+}
+
+.playback-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.playback-btn {
+  background: #2196F3;
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  padding: 10px 15px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.note-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.stat-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.stat-card h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+.playing {
+  animation: pulse 0.5s;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); background: #ffd700; }
+  100% { transform: scale(1); }
+}
 </style>
 </head>
 <body>
 
-<h2>Admin Dashboard</h2>
+<h1>🎼 Admin Dashboard - Musical Vote Conductor 🎼</h1>
 
 <div id="login">
   <input type="password" id="password" placeholder="Enter admin password">
@@ -22,13 +180,85 @@ button.reset { background: #f44336; color: white; border: none; cursor: pointer;
 </div>
 
 <div id="dashboard" style="display:none;">
-  <button class="reset" onclick="resetVotes()">Reset All Votes</button>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Vote Results & Musical Score</h2>
+    <button class="reset" onclick="resetVotes()">Reset All Votes</button>
+  </div>
+
+  <!-- Musical Playback Section -->
+  <div class="music-controls">
+    <h3>🎵 Play the Vote Melody</h3>
+    
+    <div class="playback-controls">
+      <button class="playback-btn" onclick="playFullPiece()">▶️ Play Full Piece</button>
+      <button class="playback-btn" onclick="stopPlayback()">⏹️ Stop</button>
+      
+      <div class="speed-control">
+        <label>Speed:</label>
+        <input type="range" id="tempo" min="0.5" max="2" step="0.1" value="1">
+        <span id="tempoValue">1.0x</span>
+      </div>
+      
+      <div class="speed-control">
+        <label>Volume:</label>
+        <input type="range" id="volume" min="0" max="1" step="0.1" value="0.5">
+      </div>
+    </div>
+
+    <div class="music-staff" id="musicStaff">
+      ♩ ♪ ♫ ♬
+    </div>
+
+    <!-- Note Statistics -->
+    <div class="note-stats" id="noteStats">
+      <!-- Will be populated dynamically -->
+    </div>
+  </div>
+
+  <!-- Tabular Results -->
   <div id="results"></div>
 </div>
 
 <script>
 const API = "https://api.sarunas.lat"; // Worker URL
 let password = "";
+let audioContext = null;
+let isPlaying = false;
+let currentTimeout = null;
+let currentNotes = [];
+
+// Musical notes frequency mapping
+const noteFrequencyMap = {
+  'DO': 261.63,  // C4
+  'RE': 293.66,  // D4
+  'MI': 329.63,  // E4
+  'FA': 349.23,  // F4
+  'SOL': 392.00, // G4
+  'LA': 440.00,  // A4
+  'SI': 493.88   // B4
+};
+
+// Musical note symbols for display
+const noteSymbolMap = {
+  'DO': '𝅝',  // Whole note
+  'RE': '𝅗𝅥',  // Half note
+  'MI': '𝅘𝅥',  // Quarter note
+  'FA': '𝅘𝅥𝅮',  // Eighth note
+  'SOL': '𝅘𝅥𝅯', // Sixteenth note
+  'LA': '𝅘𝅥𝅰',  // Thirty-second note
+  'SI': '𝅘𝅥𝅱'   // Sixty-fourth note
+};
+
+// Colors for different notes
+const noteColors = {
+  'DO': '#FF6B6B',
+  'RE': '#4ECDC4',
+  'MI': '#45B7D1',
+  'FA': '#96CEB4',
+  'SOL': '#FFEAA7',
+  'LA': '#DDA0DD',
+  'SI': '#FAA0A0'
+};
 
 // Login
 async function login() {
@@ -46,8 +276,111 @@ async function login() {
 
   document.getElementById("login").style.display = "none";
   document.getElementById("dashboard").style.display = "block";
+  
+  // Initialize audio context
+  initAudio();
+  
   loadResults();
 }
+
+// Initialize audio context
+async function initAudio() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume();
+  }
+}
+
+// Play a single note
+async function playNote(noteName, duration = 0.5) {
+  try {
+    await initAudio();
+    
+    const frequency = noteFrequencyMap[noteName] || 440.00;
+    const volume = parseFloat(document.getElementById('volume').value);
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    
+    // Envelope for a nice note sound
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(volume, audioContext.currentTime + 0.05);
+    gainNode.gain.linearRampToValueAtTime(volume * 0.7, audioContext.currentTime + duration * 0.3);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration);
+    
+    // Highlight the note in the staff
+    highlightNote(noteName);
+    
+  } catch (error) {
+    console.log("Audio play failed:", error);
+  }
+}
+
+// Highlight the currently playing note
+function highlightNote(noteName) {
+  const staff = document.getElementById('musicStaff');
+  const notes = staff.innerHTML.split('');
+  
+  // Create a temporary span to find and highlight
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = staff.innerHTML;
+  
+  // Add a visual indicator (you can enhance this)
+  staff.classList.add('playing');
+  setTimeout(() => staff.classList.remove('playing'), 200);
+}
+
+// Play the full musical piece from votes
+async function playFullPiece() {
+  if (isPlaying) {
+    stopPlayback();
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  const tempo = parseFloat(document.getElementById('tempo').value);
+  const baseDuration = 0.5 / tempo; // Half second per note at tempo 1
+  
+  isPlaying = true;
+  
+  for (let i = 0; i < currentNotes.length; i++) {
+    if (!isPlaying) break;
+    
+    const note = currentNotes[i];
+    await playNote(note, baseDuration);
+    
+    // Wait for the note to finish before playing the next
+    await new Promise(resolve => {
+      currentTimeout = setTimeout(resolve, baseDuration * 1000);
+    });
+  }
+  
+  isPlaying = false;
+}
+
+// Stop playback
+function stopPlayback() {
+  isPlaying = false;
+  if (currentTimeout) {
+    clearTimeout(currentTimeout);
+    currentTimeout = null;
+  }
+}
+
+// Update tempo display
+document.getElementById('tempo').addEventListener('input', function(e) {
+  document.getElementById('tempoValue').textContent = e.target.value + 'x';
+});
 
 // Load votes dynamically
 async function loadResults() {
@@ -66,12 +399,33 @@ async function loadResults() {
     grouped[v.question_id].push(v);
   });
 
+  // Create musical sequence from all votes
+  currentNotes = [];
+  data.forEach(v => {
+    for (let i = 0; i < v.count; i++) {
+      currentNotes.push(v.option);
+    }
+  });
+
+  // Update musical staff display
+  updateMusicStaff(data);
+  
+  // Update note statistics
+  updateNoteStats(data);
+
+  // Create HTML table
   let html = "";
   Object.keys(grouped).forEach(qid => {
     html += `<h3>Question: ${qid}</h3>`;
-    html += "<table><tr><th>Option</th><th>Votes</th></tr>";
+    html += "<table><tr><th>Option</th><th>Votes</th><th>Musical Representation</th></tr>";
     grouped[qid].forEach(opt => {
-      html += `<tr><td>${opt.option}</td><td>${opt.count}</td></tr>`;
+      const noteSymbol = noteSymbolMap[opt.option] || '♪';
+      const notes = noteSymbol.repeat(Math.min(opt.count, 10));
+      html += `<tr>
+        <td style="background: ${noteColors[opt.option] || '#fff'}">${opt.option}</td>
+        <td><strong>${opt.count}</strong></td>
+        <td style="font-family: MusiQwik; font-size: 24px;">${notes}</td>
+      </tr>`;
     });
     html += "</table>";
   });
@@ -79,9 +433,82 @@ async function loadResults() {
   document.getElementById("results").innerHTML = html;
 }
 
+// Update the musical staff display
+function updateMusicStaff(data) {
+  const staff = document.getElementById('musicStaff');
+  let staffHtml = '';
+  
+  // Create a sequence of notes
+  const allNotes = [];
+  data.forEach(v => {
+    for (let i = 0; i < Math.min(v.count, 5); i++) { // Limit to 5 per vote for display
+      allNotes.push(v.option);
+    }
+  });
+  
+  // Display notes in staff
+  allNotes.slice(0, 30).forEach(note => {
+    const symbol = noteSymbolMap[note] || '♪';
+    staffHtml += `<span style="color: ${noteColors[note] || '#000'}; margin: 0 5px;" title="${note}">${symbol}</span>`;
+  });
+  
+  if (allNotes.length > 30) {
+    staffHtml += '<span style="color: #999;"> ...</span>';
+  }
+  
+  // Add measure numbers
+  staffHtml = '<div style="font-size: 14px; color: #666; margin-bottom: 10px;">' + 
+              'Measure 1 &nbsp;&nbsp; Measure 2 &nbsp;&nbsp; Measure 3 &nbsp;&nbsp; Measure 4</div>' + 
+              staffHtml;
+  
+  staff.innerHTML = staffHtml;
+}
+
+// Update note statistics
+function updateNoteStats(data) {
+  const stats = document.getElementById('noteStats');
+  
+  // Count votes per note
+  const noteCounts = {};
+  data.forEach(v => {
+    noteCounts[v.option] = (noteCounts[v.option] || 0) + v.count;
+  });
+  
+  let statsHtml = '';
+  const notes = ['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI'];
+  
+  notes.forEach(note => {
+    const count = noteCounts[note] || 0;
+    const percentage = data.length > 0 ? Math.round((count / data.reduce((sum, v) => sum + v.count, 0)) * 100) : 0;
+    
+    statsHtml += `
+      <div class="stat-card" style="border-top: 4px solid ${noteColors[note] || '#999'}">
+        <h4>${note}</h4>
+        <div class="stat-number">${count}</div>
+        <div style="font-size: 12px; color: #666;">${percentage}% of votes</div>
+        <div style="font-family: MusiQwik; font-size: 24px; margin-top: 5px;">${noteSymbolMap[note] || '♪'}</div>
+      </div>
+    `;
+  });
+  
+  // Add total votes
+  const totalVotes = data.reduce((sum, v) => sum + v.count, 0);
+  statsHtml += `
+    <div class="stat-card" style="border-top: 4px solid #333; grid-column: span 2;">
+      <h4>Total Votes</h4>
+      <div class="stat-number">${totalVotes}</div>
+      <div style="font-family: MusiQwik; font-size: 32px; margin-top: 5px;">♫ ♪ ♫</div>
+    </div>
+  `;
+  
+  stats.innerHTML = statsHtml;
+}
+
 // Reset votes and reload from CSV
 async function resetVotes() {
   if (!confirm("Reset all votes and questions?")) return;
+  stopPlayback();
+  
   const res = await fetch(API + "/admin/reset", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -89,12 +516,25 @@ async function resetVotes() {
   });
 
   const data = await res.json();
-  if (data.success) { alert(data.message); loadResults(); }
+  if (data.success) { 
+    alert(data.message); 
+    loadResults(); 
+  }
   else alert(data.error);
 }
 
 // Auto-refresh every 5 seconds
-setInterval(() => { if (password) loadResults(); }, 5000);
+setInterval(() => { 
+  if (password) loadResults(); 
+}, 5000);
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+  stopPlayback();
+  if (audioContext) {
+    audioContext.close();
+  }
+});
 </script>
 </body>
 </html>
