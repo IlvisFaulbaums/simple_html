@@ -184,23 +184,52 @@ button:active {
 .volume-slider {
   width: 100px;
 }
+
+.note-duration-selector {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: white;
+  padding: 8px 15px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.duration-btn {
+  background: #ff9800;
+  color: white;
+  padding: 5px 10px;
+  font-size: 14px;
+  min-width: auto;
+}
+
+.duration-btn.active {
+  background: #4CAF50;
+  transform: scale(1.05);
+}
+
+.metronome-mark {
+  font-size: 12px;
+  color: #666;
+  margin-left: 5px;
+}
 </style>
 </head>
 <body>
 
-<h2>🎵 Musical Voting Poll with ABCJS 🎵</h2>
+<h2>🎵 Musical Voting Poll with Quarter Notes 🎵</h2>
 
 <div id="poll-container">Loading questions...</div>
 
 <div id="music-section">
-  <h3>🎼 Live Musical Score</h3>
+  <h3>🎼 Live Musical Score (Quarter Notes)</h3>
   
   <div class="playback-controls">
     <button class="playback-btn" onclick="playVoteMelody()" id="playBtn">▶️ Play Votes</button>
     <button class="playback-btn" onclick="stopVoteMelody()" id="stopBtn" disabled>⏹️ Stop</button>
     
     <div class="speed-control">
-      <label>Tempo:</label>
+      <label>♩ =</label>
       <input type="range" id="tempo" min="60" max="180" step="5" value="120" onchange="updateTempo()">
       <span id="tempoValue">120</span>
     </div>
@@ -217,6 +246,11 @@ button:active {
       <option value="A">Key of A</option>
       <option value="F">Key of F</option>
     </select>
+  </div>
+
+  <!-- Note Duration Indicator -->
+  <div style="text-align: center; margin: 10px 0; padding: 5px; background: #e0e0e0; border-radius: 4px;">
+    <span style="font-weight: bold;">All notes are quarter notes (♩) - each vote lasts one beat</span>
   </div>
 
   <!-- ABC Notation Display -->
@@ -263,15 +297,15 @@ const noteFrequencyMap = {
   'SI': 493.88   // B4
 };
 
-// Musical notes mapping to ABC notation
+// Musical notes mapping to ABC notation (all quarter notes)
 const noteToABC = {
-  'DO': 'C',
-  'RE': 'D',
-  'MI': 'E',
-  'FA': 'F',
-  'SOL': 'G',
-  'LA': 'A',
-  'SI': 'B'
+  'DO': 'C4',  // C quarter note
+  'RE': 'D4',  // D quarter note
+  'MI': 'E4',  // E quarter note
+  'FA': 'F4',  // F quarter note
+  'SOL': 'G4', // G quarter note
+  'LA': 'A4',  // A quarter note
+  'SI': 'B4'   // B quarter note
 };
 
 // Colors for different notes
@@ -295,12 +329,13 @@ async function initAudio() {
   }
 }
 
-// Play a single note using Web Audio API
-async function playNote(noteName, duration = 0.5) {
+// Play a single quarter note using Web Audio API
+async function playQuarterNote(noteName) {
   try {
     await initAudio();
     
     const frequency = noteFrequencyMap[noteName] || 440.00;
+    const duration = 60 / tempo; // Quarter note duration based on tempo
     
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -308,12 +343,12 @@ async function playNote(noteName, duration = 0.5) {
     oscillator.type = 'sine';
     oscillator.frequency.value = frequency;
     
-    // Envelope for a nice note sound
+    // Envelope for a nice quarter note sound
     const now = audioContext.currentTime;
     gainNode.gain.setValueAtTime(0, now);
     gainNode.gain.linearRampToValueAtTime(volume, now + 0.05);
     gainNode.gain.linearRampToValueAtTime(volume * 0.7, now + duration * 0.3);
-    gainNode.gain.linearRampToValueAtTime(0, now + duration);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
     
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -331,7 +366,7 @@ async function playNote(noteName, duration = 0.5) {
   }
 }
 
-// Play the full sequence of votes
+// Play the full sequence of quarter notes
 async function playVoteMelody() {
   if (isPlaying) {
     stopVoteMelody();
@@ -364,19 +399,18 @@ async function playVoteMelody() {
     return;
   }
   
-  document.getElementById('playback-status').innerHTML = `Playing: 0/${allNotes.length} notes`;
+  document.getElementById('playback-status').innerHTML = `Playing quarter notes: 0/${allNotes.length}`;
   
-  // Play each note in sequence
+  // Play each quarter note in sequence
   for (let i = 0; i < allNotes.length; i++) {
     if (!isPlaying) break;
     
     currentNoteIndex = i;
     const note = allNotes[i];
-    const duration = 60 / tempo; // Convert BPM to seconds per quarter note
     
-    document.getElementById('playback-status').innerHTML = `Playing: ${i+1}/${allNotes.length} notes (${note})`;
+    document.getElementById('playback-status').innerHTML = `Playing quarter note ${i+1}/${allNotes.length}: ${note}`;
     
-    await playNote(note, duration);
+    await playQuarterNote(note);
   }
   
   if (isPlaying) {
@@ -417,10 +451,10 @@ function updateKey() {
   updateMusicScore();
 }
 
-// Convert votes to ABC notation
+// Convert votes to ABC notation (all quarter notes)
 function votesToABC(data) {
   const tempo = document.getElementById('tempo').value;
-  let abcHeader = `X:1\nT:Current Votes\nC:Live Poll\nM:4/4\nL:1/8\nQ:1/4=${tempo}\nK:${currentKey}\n`;
+  let abcHeader = `X:1\nT:Current Votes (Quarter Notes)\nC:Live Poll\nM:4/4\nL:1/4\nQ:1/4=${tempo}\nK:${currentKey}\n`;
   
   // Collect all notes from votes
   const allNotes = [];
@@ -431,16 +465,16 @@ function votesToABC(data) {
   });
   
   if (allNotes.length === 0) {
-    return abcHeader + "z4 |]"; // Rest if no votes
+    return abcHeader + "z4 |]"; // Quarter rest if no votes
   }
   
-  // Create melody with quarter notes
+  // Create melody with quarter notes (explicitly marked as quarter notes)
   let abcBody = allNotes.map(note => {
-    const abcNote = noteToABC[note] || 'C';
-    return abcNote + '4';
+    const abcNote = noteToABC[note] || 'C4';
+    return abcNote;
   }).join(' ');
   
-  // Add bar lines every 4 notes
+  // Add bar lines every 4 quarter notes (one measure)
   const notes = abcBody.split(' ');
   let formattedBody = '';
   for (let i = 0; i < notes.length; i++) {
@@ -510,13 +544,17 @@ async function loadQuestions() {
   for (const qid in questions) {
     const div = document.createElement("div");
     div.className = "question-box";
-    div.innerHTML = `<h3>Question ${qid}</h3>`;
+    div.innerHTML = `<h3>Question ${qid} <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">(Click to vote a quarter note)</span></h3>`;
     questions[qid].forEach(opt => {
       const btn = document.createElement("button");
       btn.className = "vote-btn";
       btn.innerText = opt;
       btn.style.background = noteColors[opt] || '#4CAF50';
       btn.onclick = () => vote(qid, opt);
+      
+      // Add quarter note symbol
+      btn.innerHTML = `♩ ${opt}`;
+      
       div.appendChild(btn);
     });
     container.appendChild(div);
@@ -532,10 +570,10 @@ async function loadQuestions() {
   loadResults();
 }
 
-// Vote function with note playing
+// Vote function with quarter note playing
 async function vote(questionId, option) {
-  // Play the musical note
-  await playNote(option);
+  // Play the quarter note
+  await playQuarterNote(option);
   
   const res = await fetch(API + "/vote", {
     method: "POST",
@@ -568,7 +606,7 @@ async function loadResults() {
     html += `<strong>Question ${qid}:</strong><br>`;
     grouped[qid].forEach(o => { 
       html += `<span style="display: inline-block; margin: 5px; padding: 5px 10px; background: ${noteColors[o.option] || '#eee'}; border-radius: 4px;">`;
-      html += `${o.option}=${o.count}`;
+      html += `♩ ${o.option}=${o.count}`;
       html += `</span> `;
     });
     html += `</div>`;
@@ -601,18 +639,20 @@ function updateNoteStats(data) {
       <div class="stat-card" style="border-top-color: ${noteColors[note]}">
         <h4>${note}</h4>
         <div class="stat-number">${count}</div>
-        <div style="font-size: 12px;">${noteToABC[note]}</div>
+        <div style="font-size: 12px;">♩ quarter notes</div>
       </div>
     `;
   });
   
   // Add total
   const totalVotes = data.reduce((sum, v) => sum + v.count, 0);
+  const totalBeats = totalVotes; // Each vote is one quarter note = one beat
   statsHtml += `
     <div class="stat-card" style="border-top-color: #333;">
       <h4>Total</h4>
       <div class="stat-number">${totalVotes}</div>
       <div style="font-size: 12px;">votes</div>
+      <div style="font-size: 11px; color: #666;">${totalBeats} beats</div>
     </div>
   `;
   
