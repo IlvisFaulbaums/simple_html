@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Melody Poll - Admin Reset</title>
+    <title>Live Melody Poll - Full Reset</title>
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
     <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; }
@@ -34,9 +34,8 @@
         .results-header { font-weight: bold; color: #65676b; font-size: 0.9rem; margin-bottom: 15px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         #winning-melody-svg { width: 100%; min-height: 100px; }
 
-        /* Admin Section */
         .admin-section { width: 100%; max-width: 550px; text-align: center; margin-bottom: 40px; }
-        .reset-btn { background: #ff4d4d; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 0.8rem; opacity: 0.6; transition: 0.3s; }
+        .reset-btn { background: #ff4d4d; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 0.8rem; opacity: 0.4; transition: 0.3s; }
         .reset-btn:hover { opacity: 1; }
     </style>
 </head>
@@ -44,8 +43,8 @@
 
 <div id="app-card">
     <div id="overlay">
-        <h2>🎵 Start New Voting</h2>
-        <p style="color: #65676b; margin-bottom: 30px;">Options play automatically.</p>
+        <h2>🎵 Start New Session</h2>
+        <p style="color: #65676b; margin-bottom: 30px;">Wait for the sequence, then vote.</p>
         <button class="primary-btn" onclick="startApp()">Enter Poll</button>
     </div>
 
@@ -55,18 +54,18 @@
 </div>
 
 <div id="results-frame">
-    <div class="results-header">🏆 CURRENT WINNING MELODY (LIVE)</div>
+    <div class="results-header">🏆 LIVE WINNING MELODY</div>
     <div id="winning-melody-svg"></div>
 </div>
 
 <div class="admin-section">
-    <button class="reset-btn" onclick="adminReset()">⚠️ ADMIN: RESET ALL VOTES</button>
+    <button class="reset-btn" onclick="adminReset()">⚠️ ADMIN: WIPE DATABASE & RESET POLL</button>
 </div>
 
 <script>
     const API = "https://api.sarunas.lat";
     const SOUNDFONT = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
-    const SEC_PER_UNIT = 0.25; 
+    const SEC_PER_UNIT = 0.25; // C1=1/8 @ 120BPM
 
     let audioCtx = null;
     let pollData = [];
@@ -74,7 +73,7 @@
     let currentUI = [];
     let activeSynth = null;
 
-    // 1. Fetch Polls & Refresh Results
+    // 1. Fetch Polls & Refresh Winning Melody
     async function updateData() {
         try {
             const res = await fetch(API + "/polls");
@@ -91,27 +90,29 @@
         } catch (e) { console.error("API error", e); }
     }
 
-    // 2. Render Winning Melody Frame
+    // 2. Render Winning Melody (The frame at the bottom)
     function renderWinningMelody(data) {
-        let fullWinningAbc = "X:1\nT:Winning Melody\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n";
+        let fullWinningAbc = "X:1\nT:Live Results\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n";
         let melodyPath = "";
 
         data.forEach(question => {
+            // Find option with most votes
             let winner = question.opts.reduce((prev, current) => 
                 (prev.count > current.count) ? prev : current
             );
+            // Only add to melody if it has at least one vote
             if (winner && winner.count > 0) {
                 melodyPath += winner.option + " | ";
             }
         });
 
-        if (melodyPath === "") melodyPath = "z8";
+        if (melodyPath === "") melodyPath = "z8"; // Show rest if no votes yet
         ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: 0.9 });
     }
 
-    // 3. Admin Reset
+    // 3. Admin Reset - Clears DB and resets local state
     async function adminReset() {
-        const password = prompt("Enter Admin Password to Wipe Database:");
+        const password = prompt("ADMIN: Enter password to WIPE DATABASE and RESET ALL VOTES:");
         if (!password) return;
 
         try {
@@ -122,26 +123,30 @@
             });
 
             if (res.ok) {
-                alert("Database Reset Successfully!");
-                // Clear local state
+                alert("Database Wiped. Resetting poll...");
+                
+                // 1. Reset local tracking
                 currentIdx = 0;
                 if (activeSynth) activeSynth.stop();
                 
-                // Show overlay again to restart audio handshake
+                // 2. Clear Voter ID so user can vote again
+                localStorage.removeItem('voterId');
+
+                // 3. Show overlay for new audio handshake
                 document.getElementById('overlay').style.display = 'flex';
                 document.getElementById('overlay').style.opacity = '1';
-                
+
+                // 4. Refresh data immediately
                 await updateData();
             } else {
-                const err = await res.json();
-                alert("Reset Failed: " + (err.error || "Wrong Password"));
+                alert("Reset Failed: Incorrect Password");
             }
         } catch (e) {
-            alert("Error connecting to reset API.");
+            alert("Error connecting to Reset API.");
         }
     }
 
-    // 4. Playback Logic
+    // 4. Duration Calculation (C1=1, C2=2, etc)
     function getDuration(abc) {
         const clean = abc.replace(/[|\[\]\s]/g, '');
         const pattern = /([A-Ga-gz][',]*)(\d*)/g;
@@ -152,6 +157,7 @@
         return units * SEC_PER_UNIT;
     }
 
+    // 5. App Start
     async function startApp() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -169,7 +175,7 @@
         currentUI = [];
 
         if (currentIdx >= pollData.length) {
-            status.innerText = "All Polls Completed!";
+            status.innerText = "All Questions Voted!";
             return;
         }
 
@@ -223,7 +229,7 @@
     }
 
     function unlockVoting() {
-        document.getElementById('status').innerText = "Select your favorite";
+        document.getElementById('status').innerText = "Vote for your favorite";
         currentUI.forEach(item => {
             item.el.classList.remove('is-played');
             item.el.classList.add('can-vote');
@@ -233,8 +239,13 @@
 
     async function castVote(val) {
         currentUI.forEach(i => i.el.onclick = null);
-        const vId = localStorage.getItem('voterId') || 'v_' + Math.random().toString(36).substr(2,9);
-        localStorage.setItem('voterId', vId);
+        
+        // Generate or get voterId
+        let vId = localStorage.getItem('voterId');
+        if(!vId) {
+            vId = 'v_' + Math.random().toString(36).substr(2,9);
+            localStorage.setItem('voterId', vId);
+        }
 
         try {
             await fetch(API + "/vote", {
@@ -242,17 +253,18 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ voter_id: vId, question_id: pollData[currentIdx].id, option: val })
             });
+
             currentIdx++;
             await updateData();
             loadAndPlayCurrent();
         } catch (e) {
-            alert("Connection error");
+            alert("Voting error");
             unlockVoting();
         }
     }
 
     updateData();
-    setInterval(updateData, 5000);
+    setInterval(updateData, 5000); // Sync global results every 5s
 </script>
 
 </body>
