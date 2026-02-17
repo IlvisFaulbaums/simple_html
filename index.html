@@ -69,26 +69,28 @@ async function loadPolls(){
 // ------------------
 // Show one question
 // ------------------
-function showQuestion(idx){
+function showQuestion(q) {
   const container = document.getElementById("poll-container");
-  if(idx >= questions.length){
-    container.innerHTML="<strong>All questions completed!</strong>";
-    return;
-  }
-  const q = questions[idx];
-  container.innerHTML = `<h3>Question ${q.poll_id}</h3>`;
-  q.options.forEach(opt=>{
+  container.innerHTML = ""; // notīrīt iepriekšējo
+
+  const box = document.createElement("div");
+  box.className = "question-box";
+  box.innerHTML = `<h3>Question ${q.id}</h3>`;
+
+  // Pārvērš options no string uz masīvu
+  const opts = q.options.option_text.split(',');
+
+  opts.forEach(opt => {
     const btn = document.createElement("button");
-    btn.className="vote-btn";
-    btn.textContent = opt.option_text+" ("+opt.votes+")";
-    btn.onclick = async ()=>{
-      await vote(q.poll_id,opt.id,opt.option_text);
-      currentQuestionIndex++;
-      showQuestion(currentQuestionIndex);
-    };
-    container.appendChild(btn);
+    btn.className = "vote-btn";
+    btn.textContent = opt;
+    btn.onclick = () => vote(q.id, opt);
+    box.appendChild(btn);
   });
+
+  container.appendChild(box);
 }
+
 
 // ------------------
 // Vote
