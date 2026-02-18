@@ -1,9 +1,12 @@
+Šeit ir atjauninātais kods. Galvenās izmaiņas veiktas `loadAndPlayCurrent` funkcijā, pievienojot **`Q:1/4=120`** parametru ABC virknei, kas tiek padota atskaņotājam. Tas nodrošina, ka `abcjs` sintezators atskaņos notis tieši 120 BPM tempā, sakrītot ar progresa joslas aprēķiniem.
+
+```html
 <!DOCTYPE html>
 <html lang="lv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Muzikālā Aptauja</title>
+    <title>Muzikālā Aptauja @ Ilvis</title>
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
     <style>
         :root {
@@ -110,9 +113,9 @@
     const API = "https://api.sarunas.lat";
     const SOUNDFONT = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
     
-    // STINGRS 120 BPM: C1 = 0.25s
+    // TEMPO KONFIGURĀCIJA: 120 BPM
     const BPM = 120;
-    const SEC_PER_UNIT = 0.25; 
+    const SEC_PER_UNIT = 0.25; // Ja L:1/8, tad 1 vienība = 0.25 sekundes pie 120 BPM
 
     let audioCtx = null;
     let pollData = [];
@@ -133,7 +136,6 @@
             pollData = Object.values(grouped);
             renderWinningMelody(pollData);
             
-            // Tiešraides balsu atjaunošana
             if (currentUI.length > 0 && pollData[currentIdx]) {
                 pollData[currentIdx].opts.forEach((opt, i) => {
                     const b = document.getElementById(`badge-${i}`);
@@ -200,7 +202,10 @@
                 <div class="progress-track"><div id="fill-${i}" class="progress-fill"></div></div>
             `;
             list.appendChild(div);
-            const visual = ABCJS.renderAbc(`svg-${i}`, `X:1\nL:1/8\nK:C\n${opt.option}`, { responsive: "resize", scale: 0.8 })[0];
+            
+            // PIEVIENOTS TEMPO Q:1/4=120 katrai pogai
+            const fullAbc = `X:1\nM:4/4\nL:1/8\nQ:1/4=${BPM}\nK:C\n${opt.option}`;
+            const visual = ABCJS.renderAbc(`svg-${i}`, fullAbc, { responsive: "resize", scale: 0.8 })[0];
             currentUI.push({ visual, abc: opt.option, fillId: `fill-${i}`, duration: getDuration(opt.option), el: div });
         });
         setTimeout(() => triggerSequence(0), 100);
@@ -217,26 +222,20 @@
         .then(() => activeSynth.prime())
         .then(() => {
             const bar = document.getElementById(task.fillId);
-            
-            // 1. Tūlītēja atiestatīšana
             bar.style.transition = 'none';
             bar.style.width = '0%';
             void bar.offsetWidth; 
 
-            // 2. Sākt audio
             activeSynth.start();
 
-            // 3. Sākt progresa joslu
             bar.style.transition = `width ${task.duration}s linear`;
             bar.style.width = '100%';
 
-            // 4. Beigt tieši aprēķinātajā laikā
             setTimeout(() => {
                 if (activeSynth) activeSynth.stop();
                 task.el.classList.remove('is-playing');
                 task.el.classList.add('is-played');
-                // 100ms pauze starp melodijām
-                setTimeout(() => triggerSequence(idx + 1), 100);
+                setTimeout(() => triggerSequence(idx + 1), 200);
             }, task.duration * 1000);
         });
     }
@@ -253,15 +252,11 @@
     async function castVote(val) {
         currentUI.forEach(i => i.el.onclick = null);
         if (activeSynth) activeSynth.stop();
-        
         const qId = pollData[currentIdx].id;
         currentIdx++;
-        
         loadAndPlayCurrent();
-
         let vId = localStorage.getItem('voterId') || 'v_' + Math.random().toString(36).substr(2,9);
         localStorage.setItem('voterId', vId);
-
         fetch(API + "/vote", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
