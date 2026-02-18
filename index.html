@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Responsive Musical Poll</title>
+    <title>Muzikālā Aptauja</title>
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.1.2/dist/abcjs-basic-min.js"></script>
     <style>
         :root {
@@ -20,38 +20,22 @@
 
         body { 
             font-family: 'Segoe UI', system-ui, sans-serif; 
-            padding: 10px; 
-            background: var(--bg); 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            color: var(--text);
+            padding: 10px; background: var(--bg); 
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh; margin: 0; color: var(--text);
         }
 
         #app-card, #results-frame { 
-            background: white; 
-            width: 100%; 
-            max-width: 600px; 
-            padding: 20px; 
-            border-radius: 20px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
-            position: relative; 
-            margin-bottom: 20px; 
-            transition: all 0.3s ease;
-        }
-
-        @media (min-width: 600px) {
-            body { padding: 40px 20px; }
-            #app-card, #results-frame { padding: 30px; }
+            background: white; width: 100%; max-width: 600px; 
+            padding: 20px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            position: relative; margin-bottom: 20px;
         }
 
         #overlay { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: white; border-radius: 20px; z-index: 100;
             display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            transition: opacity 0.5s ease; text-align: center; padding: 20px;
+            text-align: center; padding: 20px;
         }
         
         .status-text { 
@@ -62,85 +46,72 @@
 
         .option-item {
             border: 2px solid #e4e6eb; border-radius: 16px; margin-bottom: 12px;
-            padding: 12px; background: #fff; transition: all 0.3s ease;
-            opacity: 0.3; pointer-events: none;
+            padding: 12px; background: #fff; transition: opacity 0.3s;
+            opacity: 0.3; pointer-events: none; position: relative;
         }
         
-        .is-playing { opacity: 1; border-color: var(--success); background: #f6ffed; transform: scale(1.01); }
+        .is-playing { opacity: 1; border-color: var(--success); background: #f6ffed; }
         .is-played { border-color: var(--warning); opacity: 0.7; }
         .can-vote { opacity: 1; pointer-events: auto; cursor: pointer; border-color: var(--primary); }
-        .can-vote:hover { background: #f0f7ff; border-width: 2px; }
-        .can-vote:active { transform: scale(0.98); }
+        .can-vote:hover { background: #f0f7ff; }
+
+        .vote-badge {
+            position: absolute; top: 10px; right: 15px;
+            background: #f0f2f5; padding: 4px 10px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: bold; color: var(--text-secondary);
+            border: 1px solid #ddd; z-index: 5;
+        }
 
         .notation-slot { width: 100%; min-height: 80px; }
-        
         .progress-track { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 10px; }
-        .progress-fill { height: 100%; background: var(--success); width: 0%; }
+        .progress-fill { height: 100%; background: var(--success); width: 0%; transition: none; }
 
         .primary-btn { 
             background: var(--primary); color: white; border: none; 
             padding: 16px 32px; border-radius: 40px; font-weight: bold; 
             font-size: 1.1rem; cursor: pointer; width: 80%; max-width: 300px;
-            display: inline-block;
-            text-align: center;
         }
 
         .results-header { 
             font-weight: bold; color: var(--text-secondary); font-size: 0.8rem; 
             margin-bottom: 15px; text-align: center; border-bottom: 1px solid #eee; 
-            padding-bottom: 10px; letter-spacing: 1px;
+            padding-bottom: 10px;
         }
 
         #winning-melody-svg { width: 100%; min-height: 100px; }
-
-        .admin-section { width: 100%; max-width: 600px; text-align: center; margin: 20px 0 40px 0; }
-        .reset-btn { 
-            background: none; color: var(--text-secondary); border: 1px solid #ddd; 
-            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.7rem; 
-            transition: 0.3s; 
-        }
-        .reset-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
-        
-        /* Final Result Styling */
-        .final-play-container {
-            text-align: center;
-            margin-top: 20px;
-            display: none;
-        }
-        
-        h2 { font-size: 1.4rem; margin-top: 0; }
-        p { font-size: 0.9rem; }
+        .final-play-container { text-align: center; margin-top: 20px; display: none; }
+        .reset-btn { background: none; color: var(--text-secondary); border: 1px solid #ddd; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.7rem; margin-top: 20px; }
     </style>
 </head>
 <body>
 
 <div id="app-card">
     <div id="overlay">
-        <h2>🎵 Start Session</h2>
-        <p style="color: var(--text-secondary); margin-bottom: 30px;">Musical sequences will play automatically.</p>
-        <button class="primary-btn" onclick="startApp()">Enter Poll</button>
+        <h2>🎵 Vai esi gatavs?</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 30px;">Melodijas tiks atskaņotas automātiski.</p>
+        <button class="primary-btn" onclick="startApp()">Sākt aptauju</button>
     </div>
-
-    <h2 style="text-align: center;">Musical Poll</h2>
-    <div id="status" class="status-text">Loading...</div>
+    <h2 style="text-align: center;">Muzikālā aptauja</h2>
+    <div id="status" class="status-text">Ielādē...</div>
     <div id="options-list"></div>
 </div>
 
 <div id="results-frame">
-    <div class="results-header">🏆 LIVE COMMUNITY MELODY</div>
+    <div class="results-header">🏆 KOPĪGĀ MELODIJA (TIEŠRAIDE)</div>
     <div id="winning-melody-svg"></div>
     <div id="final-playback" class="final-play-container">
-        <button class="primary-btn" onclick="playFinalMelody()">▶ Play Final Result</button>
+        <button class="primary-btn" onclick="playFinalMelody()">▶ Atskaņot rezultātu</button>
     </div>
 </div>
 
-<div class="admin-section">
-    <button class="reset-btn" onclick="adminReset()">⚠️ ADMIN: RESET DATABASE</button>
-</div>
+<button class="reset-btn" onclick="adminReset()">⚠️ ADMIN: ATIESTATĪT</button>
 
 <script>
     const API = "https://api.sarunas.lat";
     const SOUNDFONT = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
+    
+    // STINGRS 120 BPM: C1 = 0.25s
+    const BPM = 120;
     const SEC_PER_UNIT = 0.25; 
 
     let audioCtx = null;
@@ -149,8 +120,6 @@
     let currentUI = [];
     let activeSynth = null;
     let finalVisualObj = null;
-
-    const isMobile = window.innerWidth < 600;
 
     async function updateData() {
         try {
@@ -164,76 +133,35 @@
             pollData = Object.values(grouped);
             renderWinningMelody(pollData);
             
-            // If data update shows we finished everything, ensure UI is correct
-            if (currentIdx >= pollData.length && pollData.length > 0) {
-                showFinalView();
+            // Tiešraides balsu atjaunošana
+            if (currentUI.length > 0 && pollData[currentIdx]) {
+                pollData[currentIdx].opts.forEach((opt, i) => {
+                    const b = document.getElementById(`badge-${i}`);
+                    if (b) b.innerText = `${opt.count} balsis`;
+                });
             }
-        } catch (e) { console.error("API error", e); }
+            if (pollData.length > 0 && currentIdx >= pollData.length) showFinalView();
+        } catch (e) { console.error(e); }
     }
 
     function renderWinningMelody(data) {
-        let fullWinningAbc = "X:1\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n";
-        let melodyPath = "";
-        data.forEach(question => {
-            let winner = question.opts.reduce((prev, current) => (prev.count > current.count) ? prev : current);
-            if (winner && winner.count > 0) melodyPath += winner.option + " | ";
+        let abc = `X:1\nM:4/4\nL:1/8\nQ:1/4=${BPM}\nK:C\n`;
+        let path = "";
+        data.forEach(q => {
+            let w = q.opts.reduce((a, b) => (a.count > b.count ? a : b));
+            if (w && w.count > 0) path += w.option + " | ";
         });
-        if (melodyPath === "") melodyPath = "z8";
-        
-        // Save visualObj for playback
-        const visualObjs = ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: isMobile ? 0.7 : 0.9 });
-        finalVisualObj = visualObjs[0];
+        const v = ABCJS.renderAbc("winning-melody-svg", abc + (path || "z8"), { responsive: "resize" });
+        finalVisualObj = v[0];
     }
 
     function showFinalView() {
         document.getElementById('app-card').style.display = 'none';
         document.getElementById('final-playback').style.display = 'block';
-        document.getElementById('results-frame').style.maxWidth = '800px';
-    }
-
-    async function playFinalMelody() {
-        if (!finalVisualObj) return;
-        
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-        
-        if (activeSynth) { activeSynth.stop(); activeSynth = null; }
-        
-        activeSynth = new ABCJS.synth.CreateSynth();
-        activeSynth.init({ 
-            visualObj: finalVisualObj, 
-            audioContext: audioCtx, 
-            options: { soundFontUrl: SOUNDFONT } 
-        })
-        .then(() => activeSynth.prime())
-        .then(() => activeSynth.start())
-        .catch(e => console.error("Final playback error", e));
-    }
-
-    async function adminReset() {
-        const password = prompt("Admin password:");
-        if (!password) return;
-        try {
-            const res = await fetch(API + "/admin/reset", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password })
-            });
-            if (res.ok) {
-                currentIdx = 0;
-                if (activeSynth) activeSynth.stop();
-                localStorage.removeItem('voterId');
-                document.getElementById('app-card').style.display = 'block';
-                document.getElementById('final-playback').style.display = 'none';
-                document.getElementById('overlay').style.display = 'flex';
-                document.getElementById('overlay').style.opacity = '1';
-                await updateData();
-            } else { alert("Failed"); }
-        } catch (e) { alert("Error"); }
     }
 
     function getDuration(abc) {
-        const clean = abc.replace(/[|\[\]\s]/g, '');
+        const clean = abc.replace(/"[^"]*"/g, '').replace(/[|\[\]\s\n\r]/g, '');
         const pattern = /([A-Ga-gz][',]*)(\d*)/g;
         let units = 0, m;
         while ((m = pattern.exec(clean)) !== null) {
@@ -245,8 +173,7 @@
     async function startApp() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') await audioCtx.resume();
-        document.getElementById('overlay').style.opacity = '0';
-        setTimeout(() => document.getElementById('overlay').style.display = 'none', 500);
+        document.getElementById('overlay').style.display = 'none';
         loadAndPlayCurrent();
     }
 
@@ -255,82 +182,114 @@
             showFinalView();
             return;
         }
-
         const list = document.getElementById('options-list');
         const status = document.getElementById('status');
         list.innerHTML = '';
         currentUI = [];
-
-        if (pollData.length === 0) return;
+        if (!pollData[currentIdx]) return;
 
         const q = pollData[currentIdx];
-        status.innerText = "🎧 Playing...";
+        status.innerText = "🎧 Atskaņo melodijas...";
 
         q.opts.forEach((opt, i) => {
             const div = document.createElement('div');
             div.className = 'option-item';
-            const svgId = `svg-${i}`, barId = `bar-${i}`;
-            div.innerHTML = `<div id="${svgId}" class="notation-slot"></div><div class="progress-track"><div id="${barId}" class="progress-fill"></div></div>`;
+            div.innerHTML = `
+                <div class="vote-badge" id="badge-${i}">${opt.count} balsis</div>
+                <div id="svg-${i}" class="notation-slot"></div>
+                <div class="progress-track"><div id="fill-${i}" class="progress-fill"></div></div>
+            `;
             list.appendChild(div);
-
-            const abcText = opt.option;
-            const fullAbc = `X:1\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\n${abcText}`;
-            const visualObj = ABCJS.renderAbc(svgId, fullAbc, { responsive: "resize", scale: isMobile ? 0.75 : 0.85 })[0];
-            currentUI.push({ visualObj, abcText, barId, duration: getDuration(abcText), el: div });
+            const visual = ABCJS.renderAbc(`svg-${i}`, `X:1\nL:1/8\nK:C\n${opt.option}`, { responsive: "resize", scale: 0.8 })[0];
+            currentUI.push({ visual, abc: opt.option, fillId: `fill-${i}`, duration: getDuration(opt.option), el: div });
         });
-        triggerSequence(0);
+        setTimeout(() => triggerSequence(0), 100);
     }
 
-    function triggerSequence(index) {
-        if (index >= currentUI.length) { unlockVoting(); return; }
-        const task = currentUI[index];
+    function triggerSequence(idx) {
+        if (idx >= currentUI.length) { unlockVoting(); return; }
+        const task = currentUI[idx];
         if (activeSynth) { activeSynth.stop(); activeSynth = null; }
+
         task.el.classList.add('is-playing');
         activeSynth = new ABCJS.synth.CreateSynth();
-        activeSynth.init({ visualObj: task.visualObj, audioContext: audioCtx, options: { soundFontUrl: SOUNDFONT } })
+        activeSynth.init({ visualObj: task.visual, audioContext: audioCtx, options: { soundFontUrl: SOUNDFONT } })
         .then(() => activeSynth.prime())
         .then(() => {
-            const bar = document.getElementById(task.barId);
-            bar.style.transition = `width ${task.duration}s linear`;
-            bar.style.width = "100%";
+            const bar = document.getElementById(task.fillId);
+            
+            // 1. Tūlītēja atiestatīšana
+            bar.style.transition = 'none';
+            bar.style.width = '0%';
+            void bar.offsetWidth; 
+
+            // 2. Sākt audio
             activeSynth.start();
+
+            // 3. Sākt progresa joslu
+            bar.style.transition = `width ${task.duration}s linear`;
+            bar.style.width = '100%';
+
+            // 4. Beigt tieši aprēķinātajā laikā
             setTimeout(() => {
                 if (activeSynth) activeSynth.stop();
                 task.el.classList.remove('is-playing');
                 task.el.classList.add('is-played');
-                setTimeout(() => triggerSequence(index + 1), 200);
+                // 100ms pauze starp melodijām
+                setTimeout(() => triggerSequence(idx + 1), 100);
             }, task.duration * 1000);
         });
     }
 
     function unlockVoting() {
-        document.getElementById('status').innerText = "Vote Now";
+        document.getElementById('status').innerText = "Izvēlies savu favorītu";
         currentUI.forEach(item => {
             item.el.classList.remove('is-played');
             item.el.classList.add('can-vote');
-            item.el.onclick = () => castVote(item.abcText);
+            item.el.onclick = () => castVote(item.abc);
         });
     }
 
     async function castVote(val) {
         currentUI.forEach(i => i.el.onclick = null);
+        if (activeSynth) activeSynth.stop();
+        
+        const qId = pollData[currentIdx].id;
+        currentIdx++;
+        
+        loadAndPlayCurrent();
+
         let vId = localStorage.getItem('voterId') || 'v_' + Math.random().toString(36).substr(2,9);
         localStorage.setItem('voterId', vId);
-        try {
-            await fetch(API + "/vote", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ voter_id: vId, question_id: pollData[currentIdx].id, option: val })
-            });
-            currentIdx++;
-            await updateData();
-            loadAndPlayCurrent();
-        } catch (e) { alert("Error"); unlockVoting(); }
+
+        fetch(API + "/vote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ voter_id: vId, question_id: qId, option: val })
+        }).then(() => updateData());
+    }
+
+    async function playFinalMelody() {
+        if (!finalVisualObj) return;
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        activeSynth = new ABCJS.synth.CreateSynth();
+        activeSynth.init({ visualObj: finalVisualObj, audioContext: audioCtx, options: { soundFontUrl: SOUNDFONT } })
+        .then(() => activeSynth.prime()).then(() => activeSynth.start());
+    }
+
+    function adminReset() {
+        const p = prompt("Admin parole:");
+        if (!p) return;
+        fetch(API + "/admin/reset", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({password:p})})
+        .then(() => {
+            localStorage.removeItem('voterId');
+            location.reload();
+        });
     }
 
     updateData();
-    setInterval(updateData, 5000);
+    setInterval(updateData, 8000);
 </script>
-
 </body>
 </html>
+```
