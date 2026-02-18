@@ -1,3 +1,8 @@
+To implement this, we will modify the `loadAndPlayCurrent` function to detect the end of the session, hide the voting card, and add a playback button to the results frame.
+
+Here is the updated code:
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +24,7 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body { 
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
             padding: 10px; 
             background: var(--bg); 
             display: flex; 
@@ -39,6 +44,7 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
             position: relative; 
             margin-bottom: 20px; 
+            transition: all 0.3s ease;
         }
 
         @media (min-width: 600px) {
@@ -59,7 +65,6 @@
             font-size: 0.75rem; letter-spacing: 1.2px; 
         }
 
-        /* Voting Options */
         .option-item {
             border: 2px solid #e4e6eb; border-radius: 16px; margin-bottom: 12px;
             padding: 12px; background: #fff; transition: all 0.3s ease;
@@ -77,11 +82,12 @@
         .progress-track { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 10px; }
         .progress-fill { height: 100%; background: var(--success); width: 0%; }
 
-        /* Buttons */
         .primary-btn { 
             background: var(--primary); color: white; border: none; 
             padding: 16px 32px; border-radius: 40px; font-weight: bold; 
             font-size: 1.1rem; cursor: pointer; width: 80%; max-width: 300px;
+            display: inline-block;
+            text-align: center;
         }
 
         .results-header { 
@@ -99,6 +105,13 @@
             transition: 0.3s; 
         }
         .reset-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+        
+        /* Final Result Styling */
+        .final-play-container {
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
         
         h2 { font-size: 1.4rem; margin-top: 0; }
         p { font-size: 0.9rem; }
@@ -121,6 +134,9 @@
 <div id="results-frame">
     <div class="results-header">🏆 LIVE COMMUNITY MELODY</div>
     <div id="winning-melody-svg"></div>
+    <div id="final-playback" class="final-play-container">
+        <button class="primary-btn" onclick="playFinalMelody()">▶ Play Final Result</button>
+    </div>
 </div>
 
 <div class="admin-section">
@@ -137,8 +153,8 @@
     let currentIdx = 0;
     let currentUI = [];
     let activeSynth = null;
+    let finalVisualObj = null;
 
-    // Detect screen width for notation scaling
     const isMobile = window.innerWidth < 600;
 
     async function updateData() {
@@ -152,6 +168,11 @@
             }, {});
             pollData = Object.values(grouped);
             renderWinningMelody(pollData);
+            
+            // If data update shows we finished everything, ensure UI is correct
+            if (currentIdx >= pollData.length && pollData.length > 0) {
+                showFinalView();
+            }
         } catch (e) { console.error("API error", e); }
     }
 
@@ -163,7 +184,35 @@
             if (winner && winner.count > 0) melodyPath += winner.option + " | ";
         });
         if (melodyPath === "") melodyPath = "z8";
-        ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: isMobile ? 0.7 : 0.9 });
+        
+        // Save visualObj for playback
+        const visualObjs = ABCJS.renderAbc("winning-melody-svg", fullWinningAbc + melodyPath, { responsive: "resize", scale: isMobile ? 0.7 : 0.9 });
+        finalVisualObj = visualObjs[0];
+    }
+
+    function showFinalView() {
+        document.getElementById('app-card').style.display = 'none';
+        document.getElementById('final-playback').style.display = 'block';
+        document.getElementById('results-frame').style.maxWidth = '800px';
+    }
+
+    async function playFinalMelody() {
+        if (!finalVisualObj) return;
+        
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        
+        if (activeSynth) { activeSynth.stop(); activeSynth = null; }
+        
+        activeSynth = new ABCJS.synth.CreateSynth();
+        activeSynth.init({ 
+            visualObj: finalVisualObj, 
+            audioContext: audioCtx, 
+            options: { soundFontUrl: SOUNDFONT } 
+        })
+        .then(() => activeSynth.prime())
+        .then(() => activeSynth.start())
+        .catch(e => console.error("Final playback error", e));
     }
 
     async function adminReset() {
@@ -179,6 +228,8 @@
                 currentIdx = 0;
                 if (activeSynth) activeSynth.stop();
                 localStorage.removeItem('voterId');
+                document.getElementById('app-card').style.display = 'block';
+                document.getElementById('final-playback').style.display = 'none';
                 document.getElementById('overlay').style.display = 'flex';
                 document.getElementById('overlay').style.opacity = '1';
                 await updateData();
@@ -205,15 +256,17 @@
     }
 
     function loadAndPlayCurrent() {
+        if (pollData.length > 0 && currentIdx >= pollData.length) {
+            showFinalView();
+            return;
+        }
+
         const list = document.getElementById('options-list');
         const status = document.getElementById('status');
         list.innerHTML = '';
         currentUI = [];
 
-        if (currentIdx >= pollData.length) {
-            status.innerText = "All Done!";
-            return;
-        }
+        if (pollData.length === 0) return;
 
         const q = pollData[currentIdx];
         status.innerText = "🎧 Playing...";
@@ -286,3 +339,4 @@
 
 </body>
 </html>
+```
